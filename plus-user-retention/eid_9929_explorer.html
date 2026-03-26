@@ -1,0 +1,3458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EID 9929 — Multifeed Variety Experiment Analysis</title>
+<style>
+:root {
+  --bg: #f5f6f8;
+  --card: #fff;
+  --border: #e0e3e8;
+  --text: #1a1a2e;
+  --text2: #555;
+  --green: #0d9668;
+  --green-bg: #e6f7f0;
+  --red: #d1345b;
+  --red-bg: #fde8ed;
+  --gray: #888;
+  --gray-bg: #f0f0f0;
+  --blue: #2563eb;
+  --blue-bg: #eff4ff;
+  --header: #1a1a2e;
+  --sidebar-w: 240px;
+  --accent: #6366f1;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--text); font-size:13px; line-height:1.5; }
+a { color:var(--blue); text-decoration:none; }
+
+/* Header */
+.top-bar { position:fixed; top:0; left:0; right:0; height:48px; background:var(--header); color:#fff; display:flex; align-items:center; padding:0 24px; z-index:100; gap:16px; }
+.top-bar h1 { font-size:15px; font-weight:600; }
+.top-bar .tag { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }
+.tag-running { background:#f59e0b; color:#000; }
+
+/* Sidebar */
+.sidebar { position:fixed; top:48px; left:0; width:var(--sidebar-w); height:calc(100vh - 48px); background:var(--card); border-right:1px solid var(--border); padding:16px 0; overflow-y:auto; z-index:90; }
+.sidebar a { display:block; padding:7px 20px; font-size:12px; color:var(--text2); transition:background 0.15s; }
+.sidebar a:hover, .sidebar a.active { background:var(--blue-bg); color:var(--blue); }
+.sidebar .nav-label { padding:12px 20px 4px; font-size:10px; text-transform:uppercase; letter-spacing:0.8px; color:var(--gray); font-weight:600; }
+
+/* Main */
+.main { margin-left:var(--sidebar-w); margin-top:48px; padding:24px; max-width:1200px; }
+.section { margin-bottom:32px; }
+.section-title { font-size:18px; font-weight:700; margin-bottom:4px; color:var(--header); }
+.section-sub { font-size:12px; color:var(--text2); margin-bottom:16px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px; }
+.card-title { font-size:13px; font-weight:600; margin-bottom:10px; }
+
+/* Tables */
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { background:#f7f8fa; position:sticky; top:0; z-index:2; }
+th, td { padding:6px 10px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; }
+th:first-child, td:first-child { text-align:left; }
+tr:hover td { background:#fafbfd; }
+.tbl-wrap { max-height:500px; overflow:auto; border:1px solid var(--border); border-radius:6px; }
+
+/* Badges */
+.sig-yes { font-weight:600; }
+.delta-pos { color:var(--green); }
+.delta-neg { color:var(--red); }
+.delta-ns { color:var(--gray); }
+.badge { display:inline-block; padding:1px 6px; border-radius:4px; font-size:11px; font-weight:500; }
+.badge-green { background:var(--green-bg); color:var(--green); }
+.badge-red { background:var(--red-bg); color:var(--red); }
+.badge-gray { background:var(--gray-bg); color:var(--gray); }
+
+/* Filters */
+.filter-row { display:flex; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.filter-row label { font-size:12px; font-weight:500; color:var(--text2); }
+.filter-row select { padding:4px 8px; border:1px solid var(--border); border-radius:4px; font-size:12px; background:#fff; }
+
+/* Grid */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+
+/* Stat cards */
+.stat-row { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:12px 16px; flex:1; min-width:140px; }
+.stat-card .label { font-size:11px; color:var(--text2); }
+.stat-card .value { font-size:22px; font-weight:700; }
+.stat-card .sub { font-size:11px; color:var(--gray); }
+
+/* Chart containers */
+.chart-box { position:relative; }
+canvas { display:block; }
+
+/* Tooltip */
+.tooltip { display:none; position:absolute; background:#1a1a2e; color:#fff; padding:6px 10px; border-radius:4px; font-size:11px; pointer-events:none; z-index:50; white-space:nowrap; }
+
+/* Pivot tabs */
+.pivot-tabs { display:flex; gap:0; margin-bottom:0; }
+.pivot-tab { padding:6px 16px; font-size:12px; cursor:pointer; border:1px solid var(--border); border-bottom:none; background:#f7f8fa; color:var(--text2); border-radius:6px 6px 0 0; }
+.pivot-tab.active { background:var(--card); color:var(--text); font-weight:600; border-bottom:1px solid var(--card); margin-bottom:-1px; z-index:1; }
+
+/* Callout */
+.callout { padding:10px 14px; border-radius:6px; font-size:12px; margin-bottom:14px; }
+.callout-info { background:var(--blue-bg); border-left:3px solid var(--blue); }
+.callout-warn { background:#fff8e1; border-left:3px solid #f59e0b; }
+.callout-red { background:var(--red-bg); border-left:3px solid var(--red); }
+.callout-green { background:#eafaf1; border-left:4px solid #27ae60; }
+
+/* Insight/takeaway box */
+.insight { background:#f8f9fb; border-left:3px solid var(--accent); padding:10px 14px; border-radius:0 6px 6px 0; font-size:12px; margin-top:10px; margin-bottom:14px; }
+.insight strong { color:var(--accent); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }
+.insight ul { margin:4px 0 0 16px; }
+.insight li { margin:2px 0; }
+.key-metric { font-size:13px; font-weight:600; color:var(--accent); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-thumb { background:#ccc; border-radius:3px; }
+
+/* Activity name styling */
+.act-name { font-family:'SF Mono',Menlo,monospace; font-size:11px; }
+
+/* Legend */
+.legend { display:flex; gap:16px; font-size:11px; margin-bottom:8px; align-items:center; }
+.legend-dot { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:4px; vertical-align:middle; }
+
+/* Footer */
+.footer-note { font-size:11px; color:var(--gray); margin-top:32px; padding:12px 0; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>EID 9929 &mdash; Multifeed Variety Experiment</h1>
+  <span class="tag tag-running">Running</span>
+</div>
+
+<div class="sidebar">
+  <div class="nav-label">Report</div>
+  <a href="#summary" class="active">1. Executive Summary</a>
+  <a href="#overall">2. Overall Metrics</a>
+  <a href="#plan-split">3. By Subscription Plan</a>
+  <a href="#segment-split">4. By Engaged Days Segment</a>
+  <a href="#cross-split">5. Segment &times; Plan</a>
+  <a href="#content">6. What Users See vs Play</a>
+  <a href="#last-play">7. Last Play Analysis</a>
+  <a href="#deep-dive">8. Anchor Activity Displacement</a>
+  <a href="#session-start">9. Session Start Analysis</a>
+  <a href="#sticker-dive">10. Sticker vs Bathroom Deep Dive</a>
+  <a href="#cancel-compare">11. Renewed vs Cancelled</a>
+  <a href="#trial-direct">12. Trial vs Direct Payment</a>
+  <a href="#replay-analysis">13. Most Replayed Activities</a>
+  <div class="nav-label" style="margin-top:16px">Reference</div>
+  <a href="#definitions">Definitions</a>
+</div>
+
+<div class="main">
+
+<!-- ===== SECTION 1: EXECUTIVE SUMMARY ===== -->
+<div class="section" id="summary">
+  <h2 class="section-title">1. Executive Summary</h2>
+  <p class="section-sub">EID 9929 &mdash; Multifeed variety scaling for W0 Plus users. Control = ~17 fixed activities (manually injected) | Variant B = 23&ndash;38 activities based on ranking algorithm (injection removed). Mar 11+, 2026. Data as of Mar 25.</p>
+
+  <div class="callout callout-info">
+    <strong>Bottom line:</strong> Result flat. The only statistically significant finding is <strong>positive</strong> &mdash; Trial Yearly New-subscriber W0 retention +2.9pp (p=0.047). Cancel deltas are directional noise across all segments (no |z| &gt; 1.96). The yearly cancel headline is inflated by ex-basic mix (21% of yearly vs 13% of monthly). Keep running.
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card"><div class="label">Control</div><div class="value">5,487</div><div class="sub">users</div></div>
+    <div class="stat-card"><div class="label">Variant B (NO Injection)</div><div class="value">5,323</div><div class="sub">users</div></div>
+    <div class="stat-card"><div class="label">SRM p-value</div><div class="value">0.267</div><div class="sub">clean</div></div>
+    <div class="stat-card"><div class="label">Duration</div><div class="value">14+ days</div><div class="sub">Mar 11&ndash;25</div></div>
+  </div>
+
+  <div class="card" id="drilldown-card">
+    <div class="card-title">Progressive Drill-Down &mdash; split where cancel &amp; W0 retention disagree</div>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:12px;">
+      <span style="color:var(--green);font-weight:600;">Green bar</span> = sig good for VarB.
+      <span style="color:var(--red);font-weight:600;">Red bar</span> = sig bad. Gray = not significant.
+      &ensp;<span style="display:inline-block;background:rgba(13,150,104,0.1);color:#0d9668;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;">&#x2713; STOP</span> both agree
+      <span style="display:inline-block;background:rgba(180,83,9,0.1);color:#b45309;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;">&#x26A0; STOP</span> both worse
+      <span style="display:inline-block;background:rgba(37,99,235,0.1);color:#2563eb;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;">&#x2193; DRILL</span> disagree
+    </p>
+    <canvas id="drill-L1"></canvas>
+    <div style="font-size:11px;color:#666;margin:6px 0 2px 10px;font-weight:600;">&#x2193; 4 mixed segments &times; subscriber type (ex-basic vs new)</div>
+    <canvas id="drill-L2"></canvas>
+    <div style="font-size:11px;color:#666;margin:6px 0 2px 10px;font-weight:600;">&#x2193; 4 mixed L2 segments &times; remaining dimension</div>
+    <canvas id="drill-L3"></canvas>
+    <div class="insight" style="margin-top:10px;">
+      <strong>Drill-down conclusion</strong>
+      <ul>
+        <li><strong>Trial Yearly New (38%)</strong>: only significant cell &mdash; W0 retention <strong>+2.9pp (z=1.99, p=0.047)</strong>. Positive for VarB.</li>
+        <li><strong>Ex-basic (17%)</strong>: both metrics directionally worse across all cuts. Largest: Tr&times;ExB W0 &minus;3.9pp (z=&minus;1.47, NS). Watch cell.</li>
+        <li><strong>Monthly New (43%)</strong>: flat across sub-segments. No action.</li>
+        <li><strong>Direct (12%)</strong>: cancel better, W0 worse &mdash; consistently mixed but small n, nothing significant.</li>
+      </ul>
+    </div>
+    <details style="margin-top:14px;" id="risk-matrix-card">
+      <summary style="cursor:pointer;font-size:11px;color:var(--text2);font-weight:600;">Full risk matrix table (15 segments)</summary>
+      <div class="tbl-wrap" style="margin-top:8px;">
+        <table id="risk-matrix-table">
+          <thead><tr>
+            <th>Segment</th><th>Ctrl n</th><th>VarB n</th>
+            <th>Cancel &Delta;</th><th>z</th>
+            <th>W0 Ret &Delta;</th><th>z</th>
+            <th>Signal</th>
+          </tr></thead>
+          <tbody id="risk-matrix-body"></tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ===== SECTION 2: OVERALL METRICS ===== -->
+<div class="section" id="overall">
+  <h2 class="section-title">2. Overall Metrics</h2>
+  <p class="section-sub">GrowthBook-verified results. Control vs NO Injection (Variant B). n=4,493 / 4,345.</p>
+
+  <div class="callout callout-info">
+    <strong>Key metric &mdash; W0 Retention:</strong> 64.03% &rarr; 63.52% (&minus;0.8%, not significant). Flat overall. In our model (active_days &ge; 2), overall +0.6pp also flat. <strong>No harm detected &mdash; segment breakdown below.</strong>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Guardrail &mdash; Cancellation:</strong> GrowthBook monthly &minus;14.5% (sig), yearly +13.4% (97.8% directional). Our model shows <strong>no cancel delta is significant in any segment</strong> (all |z| &lt; 1.96). The yearly headline is driven by ex-basic mix (21% of yearly vs 13% of monthly), not a plan-level effect. See Risk Matrix in Section 1.
+  </div>
+
+  <div class="callout callout-warn">
+    <strong>Behavioral shift:</strong> Explore playtime +46.6%, Favorites &minus;47.5%. Variant B users compensate for weaker multifeed recs by actively browsing Explore.
+  </div>
+
+  <div class="card">
+    <div class="card-title">Primary &amp; Engagement Metrics</div>
+    <table id="gb-metrics-table">
+      <thead><tr>
+        <th>Metric</th><th>Control</th><th>Variant B</th><th>% Change</th><th>95% CI</th><th>Significant?</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="insight">
+    <strong>Highlights</strong>
+    <ul>
+      <li>W0 retention &minus;0.8% and D1 retention &minus;4.2% are both not significant, but D1 is 97% directionally worse &mdash; a yellow flag</li>
+      <li>Completion rate (+0.3%) and abandonment (&minus;1.6%) are flat &mdash; content quality isn't the issue</li>
+      <li>Activities/user &minus;3.4% and playtime &minus;0.3% suggest users play slightly less but for similar total time</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Source Playtime Breakdown (per session, seconds)</div>
+    <table id="gb-source-table">
+      <thead><tr>
+        <th>Source</th><th>Control</th><th>Variant B</th><th>% Change</th><th>Significant?</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Explore playtime +46.6% is significant &mdash; users actively browse for content when multifeed recs are weaker</li>
+        <li>Favorites &minus;47.5% &mdash; with more variety, users save fewer games to favorites</li>
+        <li>Multifeed, Up Next, and Lesson playtime are all flat &mdash; the core loop is intact</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 3: BY SUBSCRIPTION PLAN ===== -->
+<div class="section" id="plan-split">
+  <h2 class="section-title">3. Breakdown by Subscription Plan</h2>
+  <p class="section-sub">The biggest finding: monthly and yearly subscribers respond in opposite directions.</p>
+
+  <div class="callout callout-info">
+    <strong>W0 Retention (key metric) by plan:</strong> Monthly 83.4% &rarr; 82.9% (&minus;0.5pp, flat). Yearly 80.9% &rarr; 84.3% (<strong>+3.4pp</strong>, promising but small sample n&asymp;600). Engagement diverges: monthly activities &minus;11.3%, yearly +2.0%.
+  </div>
+
+  <div class="callout callout-green">
+    <strong>Monthly cancel improved (&minus;14.5%, significant).</strong> Yearly cancel now worse (+13.4%, significant). Removing the manual injection helps monthly churn but hurts yearly. See the 3-way breakdown below.
+  </div>
+
+  <div class="card">
+    <div class="card-title">W0 Retention by Plan (Key Metric)</div>
+    <canvas id="w0-ret-plan-chart" width="800" height="240"></canvas>
+    <div class="legend" style="margin-top:8px;">
+      <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+      <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+    </div>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Yearly W0 retention +3.4pp (80.9% &rarr; 84.3%) is the strongest positive signal in the experiment</li>
+        <li>Monthly W0 retention flat (&minus;0.5pp) &mdash; variety doesn't hurt monthly retention despite lower engagement</li>
+        <li>This asymmetry suggests yearly subscribers have higher content appetite and benefit from diversity</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Cancellation Rate &mdash; Three Views (GrowthBook + Model data, Mar 25)</div>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:12px;">Delta colored <span style="color:var(--green);font-weight:600">green</span>/<span style="color:var(--red);font-weight:600">red</span> only when statistically significant (p&lt;0.05). Gray = not significant.</p>
+
+    <div class="pivot-tabs">
+      <div class="pivot-tab active" onclick="switchCancelView('plan',this)">By Plan</div>
+      <div class="pivot-tab" onclick="switchCancelView('payment',this)">By Trial/Direct</div>
+      <div class="pivot-tab" onclick="switchCancelView('cross',this)">Plan &times; Payment</div>
+    </div>
+    <div id="cancel-view-plan" style="border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;padding:12px;">
+      <table>
+        <thead><tr><th>Plan</th><th>Ctrl Users</th><th>Ctrl Cancel%</th><th>VarB Users</th><th>VarB Cancel%</th><th>&Delta; pp</th><th>Significant?</th></tr></thead>
+        <tbody id="cancel-plan-body"></tbody>
+      </table>
+    </div>
+    <div id="cancel-view-payment" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;padding:12px;">
+      <table>
+        <thead><tr><th>Payment Type</th><th>Ctrl Users</th><th>Ctrl Cancel%</th><th>VarB Users</th><th>VarB Cancel%</th><th>&Delta; pp</th><th>Significant?</th></tr></thead>
+        <tbody id="cancel-payment-body"></tbody>
+      </table>
+    </div>
+    <div id="cancel-view-cross" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;padding:12px;">
+      <table>
+        <thead><tr><th>Segment</th><th>Ctrl Users</th><th>Ctrl Cancel%</th><th>VarB Users</th><th>VarB Cancel%</th><th>&Delta; pp</th><th>Significant?</th></tr></thead>
+        <tbody id="cancel-cross-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="callout callout-warn">
+    <strong>GrowthBook reference (Mar 25):</strong> Monthly cancel &minus;14.5% (significant, 99.6%). Yearly cancel <strong>+13.4% (now significant, 97.8% &mdash; bad direction)</strong>. This shifted since Mar 22 when yearly was not significant.
+  </div>
+
+  <div class="card">
+    <div class="card-title">Engagement Metrics by Plan (Databricks, verified against GrowthBook)</div>
+    <div class="tbl-wrap">
+      <table id="plan-table">
+        <thead><tr>
+          <th>Plan</th><th>Variant</th><th>Users</th><th>D1 Ret</th><th>W0 Ret</th><th>Avg Activities</th><th>Avg Active Days</th><th>Avg Playtime (s)</th><th>Completion %</th><th>Abandonment %</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="insight">
+      <strong>Highlights</strong>
+      <ul>
+        <li>Monthly: D1 &minus;2.6pp, activities &minus;11.3%, playtime &minus;8.1% — clear engagement drop, but W0 retention flat and cancellation significantly better</li>
+        <li>Yearly: W0 +3.4pp, activities +2.0%, playtime +1.6% — slight engagement gain, but cancellation trends worse</li>
+        <li>Completion rate improves slightly in both plans — users finish what they start, even with more variety</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Key Deltas by Plan</div>
+    <canvas id="plan-delta-chart" width="800" height="280"></canvas>
+    <div class="legend" style="margin-top:8px;">
+      <span><span class="legend-dot" style="background:#2563eb;"></span> Monthly</span>
+      <span><span class="legend-dot" style="background:#f59e0b;"></span> Yearly</span>
+      <span style="color:var(--green);">Green text = good direction</span>
+      <span style="color:var(--red);">Red text = bad direction</span>
+    </div>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Monthly and yearly move in opposite directions on almost every metric</li>
+        <li>Monthly's biggest losses: activities (&minus;11.3%) and playtime (&minus;8.1%) — users play fewer games with more variety</li>
+        <li>Yearly's quiet win: W0 retention +3.4pp and a slight activity increase — variety fuels retention for this group</li>
+        <li>Cancel rate is the surprise: monthly cancels drop significantly despite lower engagement (variety = perceived value?)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 4: BY ENGAGED DAYS SEGMENT ===== -->
+<div class="section" id="segment-split">
+  <h2 class="section-title">4. Breakdown by Engaged Days Segment</h2>
+  <p class="section-sub">engaged_days_l6d = days with &gt;7 games in last 6 days. Segment 0 = new/resurrected, 6 = daily players.</p>
+
+  <div class="callout callout-info">
+    <strong>One pivot, all deltas.</strong> Delta colored only when significant (p&lt;0.05). Most segment-level differences are not significant due to sample size. The story is in the consistent <em>direction</em> across segments.
+  </div>
+
+  <div class="card">
+    <div class="card-title">Delta by Segment (VarB &minus; Control)</div>
+    <div class="tbl-wrap">
+      <table id="seg-delta-table">
+        <thead><tr>
+          <th>Seg</th><th>Ctrl N</th><th>VarB N</th>
+          <th>&Delta; Cancel%</th><th>&Delta; MF Plays</th><th>&Delta; Unique Acts</th>
+          <th>&Delta; Active Days</th><th>&Delta; Total Plays</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="insight">
+      <strong>Read</strong>
+      <ul>
+        <li>No individual segment shows a significant cancel rate difference &mdash; sample sizes too small</li>
+        <li>Seg 0&ndash;1 (84% of users): deltas are tiny and mixed</li>
+        <li>Seg 3: biggest cancel improvement (&minus;3.9pp) with more MF plays (+3.2) &mdash; promising but not significant</li>
+        <li>Seg 5: cancel worsens (+11.5pp, n=50/68) &mdash; noisy, small sample</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 5: ENGAGED DAYS x PLAN ===== -->
+<div class="section" id="cross-split">
+  <h2 class="section-title">5. Engaged Days &times; Subscription Plan</h2>
+  <p class="section-sub">The cross-breakdown explains why monthly and yearly diverge. Look at segments 3&ndash;6.</p>
+
+  <div class="callout callout-red">
+    <strong>Monthly power users hurt:</strong> Seg 3&ndash;4 D1 retention drops &minus;8.5pp and &minus;10.5pp. Seg 6 activities plummet from 874.9 to 630.6 (&minus;28%). Established routines disrupted.
+  </div>
+  <div class="callout callout-green">
+    <strong>Yearly power users benefit:</strong> Seg 4&ndash;5 D1 retention <em>increases</em>, activities <em>increase</em>. Variety fuels yearly subscribers with higher engagement ceilings.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Monthly: D1 Retention Delta by Segment</div>
+      <canvas id="cross-d1-monthly-chart" width="380" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Yearly: D1 Retention Delta by Segment</div>
+      <canvas id="cross-d1-yearly-chart" width="380" height="220"></canvas>
+    </div>
+  </div>
+  <div class="insight">
+    <strong>Highlights</strong>
+    <ul>
+      <li>Monthly Seg 3 (&minus;8.5pp) and Seg 4 (&minus;10.5pp): the biggest D1 drops. These power users had established routines that variety disrupted</li>
+      <li>Yearly Seg 4 (+2.1pp) and Seg 5 (+5.1pp): variety lifts D1 for yearly power users who have higher content appetites</li>
+      <li>Seg 6 (daily players): D1 is 100% in both &mdash; they always come back. But monthly Seg 6 activities drop &minus;28% (874 &rarr; 631)</li>
+    </ul>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Monthly: Full Detail</div>
+      <div class="tbl-wrap">
+        <table id="cross-monthly-table">
+          <thead><tr><th>Seg</th><th>Ctrl N</th><th>VarB N</th><th>Ctrl D1</th><th>VarB D1</th><th>Ctrl Acts</th><th>VarB Acts</th><th>Ctrl Comp%</th><th>VarB Comp%</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Yearly: Full Detail</div>
+      <div class="tbl-wrap">
+        <table id="cross-yearly-table">
+          <thead><tr><th>Seg</th><th>Ctrl N</th><th>VarB N</th><th>Ctrl D1</th><th>VarB D1</th><th>Ctrl Acts</th><th>VarB Acts</th><th>Ctrl Comp%</th><th>VarB Comp%</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 6: WHAT USERS SEE VS PLAY ===== -->
+<div class="section" id="content">
+  <h2 class="section-title">6. What Users See vs Play</h2>
+  <p class="section-sub">Top 10 activities by segment. Shows vs Plays reveal which content converts and how variety changes the mix.</p>
+
+  <div class="callout callout-info">
+    <strong>Key shift:</strong> In Variant B, Disney runner games lose impressions while uniquebuilder games gain them. But play-through rates don't improve &mdash; the new activities are "filler" that dilutes high-converting anchor content.
+  </div>
+
+  <div class="filter-row">
+    <label>Variant:</label>
+    <select id="pivot-variant" onchange="renderPivots()">
+      <option value="0">Control</option>
+      <option value="2">Variant B</option>
+    </select>
+  </div>
+
+  <div class="pivot-tabs">
+    <div class="pivot-tab active" onclick="switchPivot('shown',this)">Top 10 Shown</div>
+    <div class="pivot-tab" onclick="switchPivot('played',this)">Top 10 Played</div>
+  </div>
+  <div class="card" style="border-top-left-radius:0;">
+    <div class="tbl-wrap" style="max-height:600px;">
+      <table id="pivot-table">
+        <thead><tr id="pivot-header"></tr></thead>
+        <tbody id="pivot-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">PTR by Position Bucket &mdash; Dilution Check</div>
+    <div class="filter-row">
+      <label>Segment:</label>
+      <select id="ptr-seg-filter" onchange="drawPTRPosChart()">
+        <option value="all">All Segments</option>
+        <option value="0">0 &mdash; New / Resurrected</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6 &mdash; Daily Players</option>
+      </select>
+    </div>
+    <canvas id="ptr-pos-chart" width="800" height="300"></canvas>
+    <div class="legend" style="margin-top:8px;">
+      <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+      <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+    </div>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Positions 1&ndash;3: PTR is identical (75%) &mdash; top content converts equally regardless of recommendation strategy</li>
+        <li>Positions 4&ndash;6: Variant B actually slightly higher (+1.1pp) &mdash; new activities hold up in mid-positions</li>
+        <li>Positions 7&ndash;10: &minus;4.6pp drop (p&lt;0.001) &mdash; the tail dilution. Adding more content at the bottom hurts overall conversion</li>
+        <li>Use the segment filter above to see how this pattern varies by engagement level (uses bathroom_game PTR as proxy)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Bathroom Game PTR by Segment (anchor activity, proxy for content quality signal)</div>
+    <canvas id="bathroom-ptr-chart" width="800" height="280"></canvas>
+    <div class="legend" style="margin-top:8px;">
+      <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+      <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+    </div>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Bathroom game is the #1 shown activity in every segment &mdash; a universal anchor</li>
+        <li>Its PTR drops in Variant B for segments 1&ndash;6 &mdash; more variety dilutes even the strongest anchor</li>
+        <li>PTR &gt;100% (segments 1&ndash;2 Control) means heavy replays &mdash; users return to this game multiple times per day</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Top 20 Activities by Control PTR</div>
+    <div class="tbl-wrap">
+      <table id="top20-table">
+        <thead><tr>
+          <th>#</th><th>Activity</th>
+          <th>Ctrl Imp</th><th>Ctrl Plays</th><th>Ctrl PTR</th>
+          <th>VarB Imp</th><th>VarB Plays</th><th>VarB PTR</th>
+          <th>Delta</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="insight">
+    <strong>Highlights from Top 20 PTR</strong>
+    <ul>
+      <li><strong>Frozen Anna PTR crashed:</strong> 106.5% &rarr; 66.0% (&minus;40.5pp). Position spread caused this (see Deep Dive)</li>
+      <li><strong>Bathroom game:</strong> PTR dropped from 97.6% to 92.0% &mdash; even the universal anchor loses with dilution</li>
+      <li><strong>3 activities disappeared</strong> from Variant B entirely (Disney mickey laundry, party, runner friendship)</li>
+      <li><strong>Some activities improved:</strong> Disney Cars cones +9.5pp, Spiderman charge +24pp — less competition for niche content</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Content Diversity: Unique Activities &amp; Overlap</div>
+    <canvas id="jaccard-chart" width="800" height="300"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Jaccard Similarity Detail</div>
+    <table>
+      <thead><tr><th>Segment</th><th>Control Activities</th><th>Variant B Activities</th><th>Shared</th><th>Jaccard %</th></tr></thead>
+      <tbody id="jaccard-table"></tbody>
+    </table>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Seg 0: 80.6% overlap &mdash; even low-engagement users see ~20% different content</li>
+        <li>Seg 4&ndash;6: Jaccard drops to 78&ndash;80%, meaning 20&ndash;22% truly novel activities for power users</li>
+        <li>Variant B shows 25&ndash;50% more unique activities per segment &mdash; the variety did reach users</li>
+        <li>But novel content has lower PTR &mdash; variety for variety's sake dilutes rather than enhances</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 7: LAST PLAY ANALYSIS ===== -->
+<div class="section" id="last-play">
+  <h2 class="section-title">7. Last Play Analysis</h2>
+  <p class="section-sub">What is the last activity users play each day? This reveals how sessions end and what content anchors (or fails to anchor) return behavior.</p>
+
+  <div class="callout callout-red">
+    <strong>Session ending on stickers:</strong> In Variant B Monthly, <code>meta_rewards_stickers</code> rises from 18% to 25% of last-plays &mdash; a non-game reward screen with 0% completion. Users hit the sticker wall and stop playing, replacing <code>bathroom_game</code> as the session anchor.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Monthly: Last Play Distribution (normalized %)</div>
+      <canvas id="last-play-monthly-chart" width="400" height="360"></canvas>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+        <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Yearly: Last Play Distribution (normalized %)</div>
+      <canvas id="last-play-yearly-chart" width="400" height="360"></canvas>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+        <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <strong>Takeaway</strong>
+    <ul>
+      <li><strong>Sticker displacement (Monthly):</strong> meta_rewards_stickers goes from 18.4% &rarr; 25.4% of last-plays. This 0%-completion reward screen replaces bathroom_game (a 50%-completion game) as the session ender</li>
+      <li><strong>Yearly more stable:</strong> Both variants end similarly on bathroom_game + stickers. Yearly users have more established play patterns that resist the recommendation change</li>
+      <li><strong>Source matters:</strong> bathroom_game comes from multifeed. In Variant B, weaker multifeed recs push stickers to the surface as the final activity</li>
+      <li><strong>Implication:</strong> The sticker wall may short-circuit sessions &mdash; users collect stickers and leave rather than continuing to play games</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== SECTION 8: DEEP DIVE ===== -->
+<div class="section" id="deep-dive">
+  <h2 class="section-title">8. Deep Dive: Anchor Activity Displacement</h2>
+  <p class="section-sub">Why high-converting anchor games lost impressions and PTR in Variant B.</p>
+
+  <div class="callout callout-info">
+    <strong>Case study &mdash; Disney Frozen Anna:</strong> PTR dropped from 106.5% to 66.0% (&minus;40.5pp). Root cause: In Control, Anna is concentrated at positions 1&ndash;4 (89% of impressions) where PTR is high. In Variant B, it's spread across all 10 positions &mdash; diluting into low-PTR tail slots. Same content, worse placement = worse outcome.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Frozen Anna &mdash; Control Position Distribution</div>
+      <canvas id="anna-ctrl" width="380" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Frozen Anna &mdash; Variant B Position Distribution</div>
+      <canvas id="anna-treat" width="380" height="220"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Position-level Breakdown</div>
+    <table>
+      <thead><tr><th>Position</th><th>Control Impressions</th><th>Variant B Impressions</th><th>Control %</th><th>Variant B %</th></tr></thead>
+      <tbody id="anna-table"></tbody>
+    </table>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Control concentrates Anna at positions 1&ndash;4 (89% of impressions) where users are most likely to play</li>
+        <li>Variant B spreads Anna across all 10 positions &mdash; 28% of impressions now in positions 5&ndash;10 where PTR is half</li>
+        <li>Same content, worse placement = worse outcome. Position concentration matters more than variety</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Multifeed % of Total Plays by Segment</div>
+    <canvas id="source-chart" width="800" height="300"></canvas>
+    <div class="legend" style="margin-top:8px;">
+      <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+      <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Source Shift Detail</div>
+    <table>
+      <thead><tr><th>Segment</th><th>Variant</th><th>MF Plays</th><th>Total Plays</th><th>MF %</th></tr></thead>
+      <tbody id="source-table"></tbody>
+    </table>
+    <div class="insight">
+      <strong>Takeaway</strong>
+      <ul>
+        <li>Multifeed share of plays drops 1&ndash;2pp across all segments in Variant B</li>
+        <li>Combined with the +46.6% Explore playtime, users actively route around weaker multifeed recs</li>
+        <li>Multifeed is still the dominant play source (&gt;15%), so the shift is incremental not transformative</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SECTION 9: SESSION START ===== -->
+<div class="section" id="session-start">
+  <h2 class="section-title">9. Session Start Analysis</h2>
+  <p class="section-sub">Where do users start their play session? The experiment doesn't change entry points &mdash; only what appears in multifeed.</p>
+
+  <div class="callout callout-info">
+    <strong>Entry point is identical:</strong> Multifeed is the first play source for ~64% of users in both variants. The experiment changes what's <em>inside</em> multifeed, not how users get there.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">First Play Source (% of sessions)</div>
+      <canvas id="session-source-chart" width="380" height="260"></canvas>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+        <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">First Multifeed Game Played</div>
+      <canvas id="first-mf-game-chart" width="380" height="260"></canvas>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+        <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <strong>Takeaway</strong>
+    <ul>
+      <li>Entry source is ~identical: multifeed 63.9% vs 63.6%, feed_set_world ~15%, offline_grid ~3.5%</li>
+      <li><strong>First multifeed game shifts:</strong> Bathroom drops from 33.3% &rarr; 27.5% (&minus;5.8pp), Frozen Kingdom halved (5.6% &rarr; 2.7%)</li>
+      <li>Variant B spreads first-play across more games &mdash; consistent with the &ldquo;more variety&rdquo; design intent</li>
+      <li>Disney runners (frozen_kingdom, zootopia) are the biggest losers in first-game share &mdash; pushed out by wider game mix</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== SECTION 10: STICKER VS BATHROOM ===== -->
+<div class="section" id="sticker-dive">
+  <h2 class="section-title">10. Sticker vs Bathroom Game Deep Dive</h2>
+  <p class="section-sub">Both are top-played &ldquo;activities&rdquo; from multifeed &mdash; but they are fundamentally different experiences.</p>
+
+  <div class="callout callout-warn">
+    <strong>Stickers are not a game.</strong> They&rsquo;re a reward collection mechanism: median 13s session, 0% completion rate, no gameplay loop. Bathroom Game is a real game: 84s median, ~70% completion. Treating them the same in rankings is misleading.
+  </div>
+
+  <div class="card">
+    <div class="card-title">Behavior Comparison: Sticker vs Bathroom Game</div>
+    <table>
+      <thead>
+        <tr><th>Metric</th><th colspan="2" style="text-align:center">Bathroom Game</th><th colspan="2" style="text-align:center">Meta Rewards Stickers</th></tr>
+        <tr><th></th><th>Control</th><th>Variant B</th><th>Control</th><th>Variant B</th></tr>
+      </thead>
+      <tbody id="sticker-table"></tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-red">
+    <strong>Loading time anomaly:</strong> Sticker loading time is <strong>30.5s in Variant B vs 5.7s in Control</strong> &mdash; a 5.4&times; increase. This likely degrades the experience and may contribute to user frustration. Worth investigating with engineering.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Duration Distribution</div>
+      <canvas id="sticker-dur-chart" width="380" height="280"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Loading Time (the anomaly)</div>
+      <canvas id="sticker-metrics-chart" width="380" height="280"></canvas>
+    </div>
+  </div>
+
+  <div class="insight">
+    <strong>Takeaway</strong>
+    <ul>
+      <li>Bathroom Game: genuine engagement (84s, 70% completion, 5.1 plays/user). Users like it and replay it.</li>
+      <li>Stickers: reward mechanism (13s, 0% completion, 3.6 plays/user). Users collect and leave.</li>
+      <li><strong>Loading time in Variant B is 30.5s for stickers</strong> &mdash; 5.4&times; slower than Control. Likely a backend or CDN issue worth flagging to engineering.</li>
+      <li>Both activities have similar play counts between variants &mdash; stickers aren&rsquo;t displacing bathroom, they coexist</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== SECTION 11: RENEWED VS CANCELLED ===== -->
+<div class="section" id="cancel-compare">
+  <h2 class="section-title">11. Renewed vs Cancelled: Play Pattern Differences</h2>
+  <p class="section-sub">How does Variant B&rsquo;s impact differ between users who renewed and those who cancelled?</p>
+
+  <div class="callout callout-red">
+    <strong>Monthly cancelled users hit hardest:</strong> In Variant B, monthly cancelled users play 35% fewer games (132.5 vs 204.2) and have 78% fewer total plays across all sources. Retained users show minimal difference between variants.
+  </div>
+
+  <div class="card">
+    <div class="card-title">Play Patterns: Renewed vs Cancelled by Plan</div>
+    <table>
+      <thead>
+        <tr><th>Plan</th><th>Status</th><th>Variant</th><th>Users</th><th>Games/User</th><th>Avg Duration</th><th>Completion %</th></tr>
+      </thead>
+      <tbody id="cancel-pattern-table"></tbody>
+    </table>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Games per User &mdash; Monthly</div>
+      <canvas id="cancel-monthly-chart" width="380" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Games per User &mdash; Yearly</div>
+      <canvas id="cancel-yearly-chart" width="380" height="220"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Source Distribution: Cancelled Monthly Users</div>
+    <canvas id="cancel-source-chart" width="800" height="260"></canvas>
+    <div class="legend" style="margin-top:8px;">
+      <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+      <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Top Games Comparison: Cancelled vs Retained &mdash; Monthly</div>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:10px;">Side-by-side: what cancelled users played vs what retained users played. Disney runners drop out of VarB entirely.</p>
+    <div class="grid-2">
+      <div>
+        <strong style="font-size:11px;color:var(--red)">Control &mdash; Cancelled (246 users)</strong>
+        <table>
+          <thead><tr><th>#</th><th>Activity</th><th>Plays</th><th>Compl%</th></tr></thead>
+          <tbody id="cancel-top-ctrl"></tbody>
+        </table>
+      </div>
+      <div>
+        <strong style="font-size:11px;color:var(--green)">Control &mdash; Retained (795 users)</strong>
+        <table>
+          <thead><tr><th>#</th><th>Activity</th><th>Plays</th><th>Compl%</th></tr></thead>
+          <tbody id="retained-top-ctrl-monthly"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:12px;">
+      <div>
+        <strong style="font-size:11px;color:var(--red)">Variant B &mdash; Cancelled (207 users)</strong>
+        <table>
+          <thead><tr><th>#</th><th>Activity</th><th>Plays</th><th>Compl%</th></tr></thead>
+          <tbody id="cancel-top-varb"></tbody>
+        </table>
+      </div>
+      <div>
+        <strong style="font-size:11px;color:var(--green)">Variant B &mdash; Retained (765 users)</strong>
+        <table>
+          <thead><tr><th>#</th><th>Activity</th><th>Plays</th><th>Compl%</th></tr></thead>
+          <tbody id="retained-top-varb-monthly"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-warn">
+    <strong>Disney displacement:</strong> Control retained users have 3 Disney games in their top 10 (frozen_kingdom, zootopia, mickey_bows = 2,871 plays). VarB retained users have <strong>zero</strong> Disney games in their top 10 &mdash; replaced by uniquebuilder variants (meal, dog, dressing_up). Same pattern in cancelled users.
+  </div>
+
+  <div class="insight">
+    <strong>Takeaway</strong>
+    <ul>
+      <li><strong>Monthly cancelled VarB users play 35% fewer multifeed games</strong> (132.5 vs 204.2) and 78% fewer total plays across all sources</li>
+      <li>Retained users are nearly identical between variants &mdash; the damage is concentrated on users who end up cancelling</li>
+      <li>VarB cancelled users have <em>higher</em> completion rates (59% vs 55.8%) &mdash; they play less but finish what they start, suggesting selectivity not disengagement</li>
+      <li><strong>Disney runners completely displaced</strong> in VarB top 10 (both retained and cancelled). Replaced by uniquebuilder + blippi content that has lower replay value</li>
+      <li>Yearly cancelled users are less affected: VarB actually plays slightly more (139.1 vs 126.4)</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== SECTION 12: TRIAL VS DIRECT PAYMENT ===== -->
+<div class="section" id="trial-direct">
+  <h2 class="section-title">12. Trial vs Direct Payment Analysis</h2>
+  <p class="section-sub">80&ndash;92% of experiment users are active trial users who haven&rsquo;t paid yet. This is the dominant confounding factor.</p>
+
+  <div class="callout callout-red">
+    <strong>Active trial users drive the negative signal.</strong> Monthly active trial users in VarB play 19% fewer MF games (16.7 vs 20.6) while direct payment users are flat (19.7 vs 19.8). Yearly active trial users also show a 6.5% drop in VarB. <strong>Direct payment users are unaffected by the experiment across all cuts.</strong>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card"><div class="label">Monthly Trial %</div><div class="value">~80%</div><div class="sub">of monthly users are trial</div></div>
+    <div class="stat-card"><div class="label">Yearly Trial %</div><div class="value">~92%</div><div class="sub">of yearly users are trial</div></div>
+    <div class="stat-card"><div class="label">Active Trial %</div><div class="value">72&ndash;81%</div><div class="sub">hadn&rsquo;t paid at experiment entry</div></div>
+    <div class="stat-card"><div class="label">Direct Users</div><div class="value">~1,127</div><div class="sub">12% of experiment pop</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">MF Plays per User &mdash; Trial/Direct &times; Plan &times; Cancel Status</div>
+    <table>
+      <thead>
+        <tr><th>Plan</th><th>Payment Type</th><th>Status</th><th>Ctrl Users</th><th>Ctrl MF Plays</th><th>Ctrl Compl%</th><th>Ctrl Replay</th><th>VarB Users</th><th>VarB MF Plays</th><th>VarB Compl%</th><th>VarB Replay</th><th>&Delta; MF Plays</th></tr>
+      </thead>
+      <tbody id="trial-direct-table"></tbody>
+    </table>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">MF Plays/User &mdash; Monthly by Payment Type</div>
+      <canvas id="trial-monthly-chart" width="400" height="260"></canvas>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+        <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">MF Plays/User &mdash; Yearly by Payment Type</div>
+      <canvas id="trial-yearly-chart" width="400" height="260"></canvas>
+      <div class="legend" style="margin-top:8px;">
+        <span><span class="legend-dot" style="background:#2563eb;"></span> Control</span>
+        <span><span class="legend-dot" style="background:#f59e0b;"></span> Variant B</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Replay Rate: Active Trial vs Direct</div>
+    <canvas id="replay-rate-chart" width="800" height="220"></canvas>
+  </div>
+
+  <div class="insight">
+    <strong>Takeaway</strong>
+    <ul>
+      <li><strong>Active trial users are 4&times; more sensitive</strong> to content changes than direct payment users &mdash; VarB drops their MF plays by 10&ndash;19% while direct users are flat</li>
+      <li>Trial users haven&rsquo;t committed financially yet &mdash; a worse content experience during their trial window directly risks conversion</li>
+      <li><strong>Replay rate drops consistently in VarB</strong> (1.57&ndash;1.68 vs 1.60&ndash;1.86). More variety = less replay = fewer total plays per user</li>
+      <li>Direct monthly retained users are nearly identical (19.8 vs 19.7 MF plays) &mdash; experiment has zero effect on committed users</li>
+      <li>Implication: the experiment should be re-evaluated specifically for trial users, or the trial window should use a curated experience while paid users get variety</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== SECTION 13: MOST REPLAYED ACTIVITIES ===== -->
+<div class="section" id="replay-analysis">
+  <h2 class="section-title">13. Most Replayed Activities</h2>
+  <p class="section-sub">Which activities do users come back to? Replay = same user playing same activity multiple times. High replay = sticky content.</p>
+
+  <div class="callout callout-info">
+    <strong>Bathroom game is the replay king</strong> &mdash; 1,455 users in Control choose it as their most-replayed activity (avg 6.4 replays). In VarB, bathroom drops to 1,157 users and 4.8 replays (&minus;25% replay volume). Stickers rise to #1 by user count in VarB (629 vs 570). More variety fragments replay behavior.
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Control &mdash; Top Replayed Activities</div>
+      <canvas id="replay-ctrl-chart" width="400" height="280"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Variant B &mdash; Top Replayed Activities</div>
+      <canvas id="replay-varb-chart" width="400" height="280"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Replay Comparison Table</div>
+    <table>
+      <thead>
+        <tr><th>Activity</th><th>Ctrl Users</th><th>Ctrl Avg Replays</th><th>VarB Users</th><th>VarB Avg Replays</th><th>&Delta; Users</th><th>&Delta; Replays</th></tr>
+      </thead>
+      <tbody id="replay-compare-table"></tbody>
+    </table>
+  </div>
+
+  <div class="insight">
+    <strong>Takeaway</strong>
+    <ul>
+      <li><strong>VarB fragments replay behavior:</strong> bathroom loses 298 users (&minus;20%) and 1.6 avg replays (&minus;25%). The #1 engagement anchor is diluted</li>
+      <li><strong>Disney runners nearly disappear</strong> as top-replayed activities: frozen_kingdom drops from 233 to 88 users (&minus;62%)</li>
+      <li>Uniquebuilder games (pastry, cat, pizza, dentist, meal) all gain users in VarB &mdash; but at lower replay rates (2.8&ndash;3.6 vs 3.5&ndash;4.6)</li>
+      <li>Stickers: more users (629 vs 570) but they&rsquo;re a &ldquo;dead end&rdquo; (0% completion, 13s median duration) &mdash; replays of a non-game inflate the number</li>
+      <li><strong>Net effect:</strong> variety redistributes engagement across more activities but reduces total engagement volume per user</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== DEFINITIONS ===== -->
+<div class="section" id="definitions">
+  <h2 class="section-title">Definitions</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>Term</th><th>Definition</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td><strong>engaged_days_l6d</strong></td><td>Days with &gt;7 games in last 6 days before entry. Seg 0 = new/resurrected.</td><td>deterministic_seg_daily</td></tr>
+        <tr><td><strong>Impressions</strong></td><td>Times an activity appeared in multifeed positions 1&ndash;10 (feed_position=1).</td><td>multifeed_shown_content</td></tr>
+        <tr><td><strong>Plays</strong></td><td>Game plays from multifeed (source='multifeed', type='game').</td><td>all_activity_exit</td></tr>
+        <tr><td><strong>PTR</strong></td><td>Play-Through Rate = plays / impressions. Can exceed 100% via replays.</td><td>Computed</td></tr>
+        <tr><td><strong>D1 Retention</strong></td><td>Played any game 24&ndash;48h after experiment entry.</td><td>GrowthBook / all_activity_exit</td></tr>
+        <tr><td><strong>W0 Retention</strong></td><td>Came back to play on days 1&ndash;6 after entry.</td><td>GrowthBook</td></tr>
+        <tr><td><strong>Cancellation Rate &darr;</strong></td><td>% of users who cancelled subscription. Inverse: lower = better.</td><td>GrowthBook</td></tr>
+        <tr><td><strong>Completion Rate</strong></td><td>% of started activities that were completed.</td><td>GrowthBook</td></tr>
+        <tr><td><strong>Abandonment Rate &darr;</strong></td><td>% of started activities abandoned before completion. Inverse.</td><td>GrowthBook</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer-note">
+    Data from sandbox.lingokids_tammyliang_content.eid_9929_user_analysis (Mar 25). GrowthBook cancellation numbers verified. Report updated 2026-03-25.
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+
+const segData = [
+  {v:0,s:0,total:406,complete:202,days:2.0,pt:11.7,plays:7.8,dur:100.3,d1:30.0,stdPt:13.7,stdDays:1.3},
+  {v:0,s:1,total:1222,complete:553,days:2.5,pt:21.0,plays:14.4,dur:89.4,d1:42.7,stdPt:22.6,stdDays:1.4},
+  {v:0,s:2,total:667,complete:381,days:3.5,pt:29.7,plays:20.8,dur:87.3,d1:69.1,stdPt:26.3,stdDays:1.4},
+  {v:0,s:3,total:465,complete:307,days:4.1,pt:42.4,plays:26.3,dur:99.6,d1:76.3,stdPt:35.9,stdDays:1.5},
+  {v:0,s:4,total:312,complete:237,days:5.2,pt:56.7,plays:38.7,dur:89.1,d1:83.7,stdPt:44.2,stdDays:1.3},
+  {v:0,s:5,total:218,complete:196,days:5.8,pt:71.3,plays:50.3,dur:89.6,d1:92.7,stdPt:62.0,stdDays:1.2},
+  {v:0,s:6,total:162,complete:146,days:6.7,pt:129.6,plays:100.1,dur:82.4,d1:100.0,stdPt:259.6,stdDays:0.8},
+  {v:2,s:0,total:412,complete:211,days:2.0,pt:11.5,plays:7.7,dur:97.2,d1:31.1,stdPt:15.5,stdDays:1.3},
+  {v:2,s:1,total:1216,complete:529,days:2.5,pt:19.2,plays:13.2,dur:90.7,d1:39.2,stdPt:21.7,stdDays:1.3},
+  {v:2,s:2,total:694,complete:380,days:3.4,pt:27.9,plays:18.8,dur:92.5,d1:66.6,stdPt:23.6,stdDays:1.4},
+  {v:2,s:3,total:422,complete:289,days:4.3,pt:42.3,plays:29.1,dur:91.0,d1:76.5,stdPt:36.3,stdDays:1.4},
+  {v:2,s:4,total:274,complete:212,days:5.1,pt:61.0,plays:40.5,dur:91.4,d1:84.7,stdPt:62.2,stdDays:1.4},
+  {v:2,s:5,total:203,complete:177,days:6.1,pt:78.6,plays:54.6,dur:90.0,d1:93.6,stdPt:60.4,stdDays:1.1},
+  {v:2,s:6,total:146,complete:140,days:6.6,pt:104.9,plays:77.5,dur:84.8,d1:98.6,stdPt:91.6,stdDays:1.1}
+];
+
+const divData = [
+  {v:0,s:0,shown:20.1,played:4.8,rep:1.50},
+  {v:0,s:1,shown:20.5,played:8.1,rep:1.70},
+  {v:0,s:2,shown:24.3,played:10.8,rep:1.95},
+  {v:0,s:3,shown:26.9,played:13.5,rep:2.01},
+  {v:0,s:4,shown:31.3,played:17.2,rep:2.29},
+  {v:0,s:5,shown:34.5,played:19.5,rep:2.61},
+  {v:0,s:6,shown:38.3,played:25.0,rep:3.24},
+  {v:2,s:0,shown:20.2,played:5.0,rep:1.42},
+  {v:2,s:1,shown:22.2,played:8.2,rep:1.64},
+  {v:2,s:2,shown:27.2,played:11.0,rep:1.77},
+  {v:2,s:3,shown:33.5,played:15.0,rep:1.94},
+  {v:2,s:4,shown:38.8,played:18.3,rep:2.08},
+  {v:2,s:5,shown:44.6,played:23.6,rep:2.30},
+  {v:2,s:6,shown:49.1,played:27.1,rep:2.65}
+];
+
+const top20 = [
+  {r:1,act:"game_answer_race_disney_cars_cones",cI:896,cP:1010,cPTR:112.7,tI:649,tP:793,tPTR:122.2,d:9.5},
+  {r:2,act:"game_dressupparty_disney_frozen_anna",cI:749,cP:798,cPTR:106.5,tI:1093,tP:721,tPTR:66.0,d:-40.5},
+  {r:3,act:"bathroom_game",cI:17987,cP:17551,cPTR:97.6,tI:15001,tP:13800,tPTR:92.0,d:-5.6},
+  {r:4,act:"game_uniquebuilder_disney_zootopia_cluehunt",cI:4758,cP:3114,cPTR:65.4,tI:4757,tP:2803,tPTR:58.9,d:-6.5},
+  {r:5,act:"game_ptg_charge_disney_cars_mcqueen",cI:966,cP:607,cPTR:62.8,tI:515,tP:447,tPTR:86.8,d:24.0},
+  {r:6,act:"game_uniquebuilder_disney_mickey_laundry",cI:913,cP:522,cPTR:57.2,tI:null,tP:null,tPTR:null,d:null},
+  {r:7,act:"game_uniquebuilder_housechores",cI:902,cP:479,cPTR:53.1,tI:2475,tP:1030,tPTR:41.6,d:-11.5},
+  {r:8,act:"game_uniquebuilder_disney_mickey_party",cI:716,cP:374,cPTR:52.2,tI:null,tP:null,tPTR:null,d:null},
+  {r:9,act:"game_uniquebuilder_meal",cI:2846,cP:1365,cPTR:48.0,tI:4987,tP:2234,tPTR:44.8,d:-3.2},
+  {r:10,act:"game_ptg_wallbreaker_disney_spiderman_substraction",cI:2899,cP:1325,cPTR:45.7,tI:2838,tP:1422,tPTR:50.1,d:4.4},
+  {r:11,act:"game_puzzle_path_disney_frozen_palace",cI:2576,cP:1163,cPTR:45.1,tI:1375,tP:549,tPTR:39.9,d:-5.2},
+  {r:12,act:"game_uniquebuilder_dentist",cI:6086,cP:2741,cPTR:45.0,tI:5557,tP:2678,tPTR:48.2,d:3.2},
+  {r:13,act:"game_bars_blippi_characters",cI:1159,cP:517,cPTR:44.6,tI:1329,tP:709,tPTR:53.3,d:8.7},
+  {r:14,act:"game_runner_disney_mickey_friendship",cI:561,cP:234,cPTR:41.7,tI:null,tP:null,tPTR:null,d:null},
+  {r:15,act:"game_uniquebuilder_pizzamaker",cI:10710,cP:4412,cPTR:41.2,tI:9353,tP:3854,tPTR:41.2,d:0.0},
+  {r:16,act:"game_pastry_maker",cI:7513,cP:3036,cPTR:40.4,tI:7363,tP:2987,tPTR:40.6,d:0.2},
+  {r:17,act:"game_runner_disney_zootopia_animals",cI:6144,cP:2441,cPTR:39.7,tI:1743,tP:851,tPTR:48.8,d:9.1},
+  {r:18,act:"game_runner_disney_frozen_kingdom",cI:11570,cP:4575,cPTR:39.5,tI:6934,tP:2777,tPTR:40.0,d:0.5},
+  {r:19,act:"game_uniquebuilder_blippi_routine",cI:4675,cP:1799,cPTR:38.5,tI:2743,tP:1215,tPTR:44.3,d:5.8},
+  {r:20,act:"game_ptg_charge_disney_spiderman_spin",cI:874,cP:323,cPTR:37.0,tI:596,tP:198,tPTR:33.2,d:-3.8}
+];
+
+const ptrPos = [
+  {v:0,pos:"1-3",imp:57561,plays:43144,ptr:74.95},
+  {v:0,pos:"4-6",imp:57561,plays:19483,ptr:33.85},
+  {v:0,pos:"7-10",imp:76176,plays:25794,ptr:33.86},
+  {v:2,pos:"1-3",imp:55284,plays:41217,ptr:74.56},
+  {v:2,pos:"4-6",imp:55284,plays:19338,ptr:34.98},
+  {v:2,pos:"7-10",imp:73151,plays:21415,ptr:29.28}
+];
+
+const annaCtrl = [59,59,211,420,0,0,0,0,0,0];
+const annaTreat = [112,124,271,142,91,101,65,50,59,78];
+
+const jaccardData = [
+  {s:0,ctrl:149,treat:149,shared:133,j:80.6},
+  {s:1,ctrl:159,treat:167,shared:153,j:88.4},
+  {s:2,ctrl:163,treat:168,shared:154,j:87.0},
+  {s:3,ctrl:166,treat:187,shared:161,j:83.9},
+  {s:4,ctrl:163,treat:196,shared:160,j:80.4},
+  {s:5,ctrl:168,treat:207,shared:165,j:78.6},
+  {s:6,ctrl:172,treat:210,shared:168,j:78.5}
+];
+
+const sourceData = [
+  {v:0,s:0,mf:4132,total:20402,pct:20.3},
+  {v:0,s:1,mf:22674,total:128605,pct:17.6},
+  {v:0,s:2,mf:16064,total:90803,pct:17.7},
+  {v:0,s:3,mf:11887,total:67941,pct:17.5},
+  {v:0,s:4,mf:8844,total:53968,pct:16.4},
+  {v:0,s:5,mf:6924,total:41890,pct:16.5},
+  {v:0,s:6,mf:7547,total:45923,pct:16.4},
+  {v:2,s:0,mf:4170,total:20374,pct:20.5},
+  {v:2,s:1,mf:21464,total:121410,pct:17.7},
+  {v:2,s:2,mf:14869,total:86484,pct:17.2},
+  {v:2,s:3,mf:11384,total:66358,pct:17.2},
+  {v:2,s:4,mf:8225,total:50373,pct:16.3},
+  {v:2,s:5,mf:6800,total:41599,pct:16.3},
+  {v:2,s:6,mf:5253,total:31654,pct:16.6}
+];
+
+// Shown/Played pivot data
+const shownData = [["0","0","1","bathroom_game","1199"],["0","0","2","game_uniquebuilder_cat","693"],["0","0","3","game_uniquebuilder_pizzamaker","677"],["0","0","4","game_pastry_maker","623"],["0","0","5","game_runner_disney_frozen_kingdom","599"],["0","0","6","game_runner_disney_zootopia_animals","475"],["0","0","7","game_uniquebuilder_dentist","465"],["0","0","8","game_answer_race_disney_mickey_bows","455"],["0","0","9","game_uniquebuilder_blippi_routine","405"],["0","0","10","game_runner_pocoyo_bugs","386"],["0","1","1","bathroom_game","4076"],["0","1","2","game_uniquebuilder_cat","2491"],["0","1","3","game_runner_disney_frozen_kingdom","2422"],["0","1","4","game_uniquebuilder_pizzamaker","2058"],["0","1","5","game_pastry_maker","1883"],["0","1","6","game_runner_disney_zootopia_animals","1689"],["0","1","7","game_uniquebuilder_blippi_dinosaurs","1639"],["0","1","8","game_answer_race_disney_mickey_bows","1635"],["0","1","9","game_uniquebuilder_dentist","1541"],["0","1","10","game_runner_pocoyo_bugs","1355"],["0","2","1","bathroom_game","3018"],["0","2","2","game_runner_disney_frozen_kingdom","1760"],["0","2","3","game_uniquebuilder_cat","1733"],["0","2","4","game_answer_race_disney_mickey_bows","1672"],["0","2","5","game_uniquebuilder_pizzamaker","1574"],["0","2","6","game_pastry_maker","1460"],["0","2","7","game_uniquebuilder_dentist","1307"],["0","2","8","game_runner_disney_zootopia_animals","1254"],["0","2","9","game_uniquebuilder_blippi_dinosaurs","1038"],["0","2","10","game_uniquebuilder_dog","986"],["0","3","1","bathroom_game","2205"],["0","3","2","game_uniquebuilder_cat","1340"],["0","3","3","game_uniquebuilder_pizzamaker","1209"],["0","3","4","game_pastry_maker","1209"],["0","3","5","game_runner_disney_frozen_kingdom","1196"],["0","3","6","game_answer_race_disney_mickey_bows","1067"],["0","3","7","game_runner_disney_zootopia_animals","964"],["0","3","8","game_uniquebuilder_dentist","926"],["0","3","9","game_uniquebuilder_dog","820"],["0","3","10","game_uniquebuilder_blippi_routine","740"],["0","4","1","bathroom_game","1525"],["0","4","2","game_uniquebuilder_pizzamaker","965"],["0","4","3","game_uniquebuilder_cat","914"],["0","4","4","game_pastry_maker","829"],["0","4","5","game_runner_disney_frozen_kingdom","805"],["0","4","6","game_uniquebuilder_dentist","670"],["0","4","7","game_runner_disney_zootopia_animals","655"],["0","4","8","game_answer_race_disney_mickey_bows","614"],["0","4","9","game_uniquebuilder_dog","557"],["0","4","10","game_uniquebuilder_blippi_routine","509"],["0","5","1","bathroom_game","961"],["0","5","2","game_pastry_maker","605"],["0","5","3","game_uniquebuilder_pizzamaker","598"],["0","5","4","game_uniquebuilder_cat","596"],["0","5","5","game_runner_disney_frozen_kingdom","516"],["0","5","6","game_runner_disney_zootopia_animals","427"],["0","5","7","game_uniquebuilder_dentist","404"],["0","5","8","game_answer_race_disney_mickey_bows","385"],["0","5","9","game_uniquebuilder_dog","382"],["0","5","10","game_uniquebuilder_blippi_dinosaurs","327"],["0","6","1","bathroom_game","574"],["0","6","2","game_uniquebuilder_pizzamaker","343"],["0","6","3","game_uniquebuilder_cat","336"],["0","6","4","game_pastry_maker","335"],["0","6","5","game_runner_disney_frozen_kingdom","314"],["0","6","6","game_uniquebuilder_dentist","295"],["0","6","7","game_uniquebuilder_dog","240"],["0","6","8","game_answer_race_disney_mickey_bows","239"],["0","6","9","game_runner_disney_zootopia_animals","231"],["0","6","10","game_uniquebuilder_blippi_dinosaurs","221"],["2","0","1","bathroom_game","1184"],["2","0","2","game_uniquebuilder_cat","846"],["2","0","3","game_uniquebuilder_pizzamaker","824"],["2","0","4","game_pastry_maker","812"],["2","0","5","game_uniquebuilder_dentist","603"],["2","0","6","game_uniquebuilder_meal","595"],["2","0","7","game_uniquebuilder_dog","589"],["2","0","8","game_uniquebuilder_blippi_dinosaurs","440"],["2","0","9","game_sortblocks_lisa","373"],["2","0","10","game_runner_disney_frozen_kingdom","349"],["2","1","1","bathroom_game","3993"],["2","1","2","game_uniquebuilder_cat","2726"],["2","1","3","game_pastry_maker","2364"],["2","1","4","game_uniquebuilder_pizzamaker","2117"],["2","1","5","game_uniquebuilder_dentist","1879"],["2","1","6","game_uniquebuilder_meal","1793"],["2","1","7","game_uniquebuilder_dog","1688"],["2","1","8","game_uniquebuilder_blippi_dinosaurs","1608"],["2","1","9","game_dressing_up","1417"],["2","1","10","game_runner_disney_frozen_kingdom","1262"],["2","2","1","bathroom_game","2908"],["2","2","2","game_uniquebuilder_cat","1533"],["2","2","3","game_pastry_maker","1478"],["2","2","4","game_uniquebuilder_pizzamaker","1312"],["2","2","5","game_uniquebuilder_dentist","1244"],["2","2","6","game_uniquebuilder_dog","1192"],["2","2","7","game_uniquebuilder_meal","1035"],["2","2","8","game_robot_maker","885"],["2","2","9","game_dressing_up","827"],["2","2","10","game_sortblocks_lisa","760"],["2","3","1","bathroom_game","1174"],["2","3","2","game_pastry_maker","865"],["2","3","3","game_uniquebuilder_cat","821"],["2","3","4","game_uniquebuilder_pizzamaker","720"],["2","3","5","game_uniquebuilder_dog","583"],["2","3","6","game_uniquebuilder_dentist","576"],["2","3","7","game_uniquebuilder_meal","548"],["2","3","8","game_sortblocks_lisa","540"],["2","3","9","game_uniquebuilder_housechores","477"],["2","3","10","game_uniquebuilder_blippi_dinosaurs","470"],["2","4","1","bathroom_game","710"],["2","4","2","game_uniquebuilder_pizzamaker","570"],["2","4","3","game_pastry_maker","559"],["2","4","4","game_uniquebuilder_cat","542"],["2","4","5","game_uniquebuilder_dentist","365"],["2","4","6","game_dressing_up","345"],["2","4","7","game_uniquebuilder_dog","339"],["2","4","8","game_sortblocks_lisa","325"],["2","4","9","game_runner_disney_frozen_kingdom","293"],["2","4","10","game_uniquebuilder_blippi_dinosaurs","283"],["2","5","1","bathroom_game","494"],["2","5","2","game_pastry_maker","407"],["2","5","3","game_uniquebuilder_cat","368"],["2","5","4","game_uniquebuilder_pizzamaker","357"],["2","5","5","game_dressing_up","257"],["2","5","6","game_uniquebuilder_dog","239"],["2","5","7","game_uniquebuilder_dentist","236"],["2","5","8","game_answer_race_disney_mickey_bows","209"],["2","5","9","game_runner_disney_frozen_kingdom","207"],["2","5","10","game_uniquebuilder_blippi_routine","205"],["2","6","1","bathroom_game","350"],["2","6","2","game_uniquebuilder_pizzamaker","277"],["2","6","3","game_uniquebuilder_cat","267"],["2","6","4","game_pastry_maker","250"],["2","6","5","game_uniquebuilder_dentist","188"],["2","6","6","game_uniquebuilder_dog","174"],["2","6","7","game_runner_disney_frozen_kingdom","168"],["2","6","8","game_dressing_up","166"],["2","6","9","game_sortblocks_lisa","164"],["2","6","10","game_uniquebuilder_blippi_dinosaurs","131"]];
+
+const playedData = [["0","0","1","bathroom_game","766"],["0","0","2","meta_rewards_stickers","252"],["0","0","3","game_runner_disney_frozen_kingdom","229"],["0","0","4","game_uniquebuilder_pizzamaker","209"],["0","0","5","game_runner_disney_zootopia_animals","171"],["0","0","6","game_answer_race_disney_mickey_bows","160"],["0","0","7","game_pastry_maker","158"],["0","0","8","game_uniquebuilder_cat","135"],["0","0","9","game_uniquebuilder_dentist","113"],["0","0","10","game_uniquebuilder_blippi_routine","112"],["0","1","1","bathroom_game","4540"],["0","1","2","meta_rewards_stickers","1966"],["0","1","3","game_runner_disney_frozen_kingdom","1047"],["0","1","4","game_uniquebuilder_pizzamaker","956"],["0","1","5","game_uniquebuilder_cat","943"],["0","1","6","game_runner_disney_zootopia_animals","779"],["0","1","7","game_pastry_maker","771"],["0","1","8","game_uniquebuilder_dentist","699"],["0","1","9","game_answer_race_disney_mickey_bows","625"],["0","1","10","game_uniquebuilder_blippi_routine","509"],["0","2","1","bathroom_game","2868"],["0","2","2","meta_rewards_stickers","1361"],["0","2","3","game_runner_disney_frozen_kingdom","704"],["0","2","4","game_uniquebuilder_pizzamaker","626"],["0","2","5","game_uniquebuilder_cat","621"],["0","2","6","game_uniquebuilder_dentist","620"],["0","2","7","game_pastry_maker","570"],["0","2","8","game_answer_race_disney_mickey_bows","560"],["0","2","9","game_runner_disney_zootopia_animals","491"],["0","2","10","game_uniquebuilder_blippi_routine","397"],["0","3","1","bathroom_game","2010"],["0","3","2","meta_rewards_stickers","991"],["0","3","3","game_uniquebuilder_cat","499"],["0","3","4","game_pastry_maker","459"],["0","3","5","game_runner_disney_frozen_kingdom","443"],["0","3","6","game_uniquebuilder_pizzamaker","437"],["0","3","7","game_uniquebuilder_dentist","406"],["0","3","8","game_answer_race_disney_mickey_bows","371"],["0","3","9","game_runner_disney_zootopia_animals","369"],["0","3","10","game_uniquebuilder_blippi_routine","257"],["0","4","1","bathroom_game","1326"],["0","4","2","meta_rewards_stickers","803"],["0","4","3","game_uniquebuilder_pizzamaker","406"],["0","4","4","game_pastry_maker","348"],["0","4","5","game_uniquebuilder_cat","326"],["0","4","6","game_uniquebuilder_dentist","315"],["0","4","7","game_runner_disney_frozen_kingdom","293"],["0","4","8","game_runner_disney_zootopia_animals","260"],["0","4","9","game_uniquebuilder_blippi_routine","197"],["0","4","10","game_answer_race_disney_mickey_bows","187"],["0","5","1","bathroom_game","852"],["0","5","2","meta_rewards_stickers","599"],["0","5","3","game_pastry_maker","350"],["0","5","4","game_uniquebuilder_pizzamaker","275"],["0","5","5","game_uniquebuilder_dentist","269"],["0","5","6","game_uniquebuilder_cat","265"],["0","5","7","game_runner_disney_frozen_kingdom","211"],["0","5","8","game_runner_disney_zootopia_animals","166"],["0","5","9","game_uniquebuilder_blippi_routine","141"],["0","5","10","game_uniquebuilder_blippi_dinosaurs","131"],["0","6","1","bathroom_game","755"],["0","6","2","meta_rewards_stickers","697"],["0","6","3","game_uniquebuilder_pizzamaker","296"],["0","6","4","game_pastry_maker","268"],["0","6","5","game_uniquebuilder_dentist","265"],["0","6","6","game_uniquebuilder_cat","257"],["0","6","7","game_uniquebuilder_disney_cars_raceday","157"],["0","6","8","game_dressing_up","149"],["0","6","9","game_runner_disney_frozen_kingdom","144"],["0","6","10","game_uniquebuilder_meal","130"],["2","0","1","bathroom_game","827"],["2","0","2","meta_rewards_stickers","237"],["2","0","3","game_uniquebuilder_pizzamaker","224"],["2","0","4","game_uniquebuilder_cat","207"],["2","0","5","game_uniquebuilder_dentist","192"],["2","0","6","game_pastry_maker","186"],["2","0","7","game_uniquebuilder_meal","182"],["2","0","8","game_uniquebuilder_dog","133"],["2","0","9","game_runner_disney_frozen_kingdom","133"],["2","0","10","game_uniquebuilder_blippi_dinosaurs","112"],["2","1","1","bathroom_game","3763"],["2","1","2","meta_rewards_stickers","2044"],["2","1","3","game_uniquebuilder_cat","1134"],["2","1","4","game_pastry_maker","969"],["2","1","5","game_uniquebuilder_dentist","944"],["2","1","6","game_uniquebuilder_pizzamaker","924"],["2","1","7","game_uniquebuilder_meal","794"],["2","1","8","game_runner_disney_frozen_kingdom","558"],["2","1","9","game_uniquebuilder_dog","529"],["2","1","10","game_uniquebuilder_blippi_dinosaurs","517"],["2","2","1","bathroom_game","2476"],["2","2","2","meta_rewards_stickers","1314"],["2","2","3","game_uniquebuilder_dentist","635"],["2","2","4","game_uniquebuilder_pizzamaker","615"],["2","2","5","game_pastry_maker","606"],["2","2","6","game_uniquebuilder_cat","583"],["2","2","7","game_uniquebuilder_meal","451"],["2","2","8","game_uniquebuilder_dog","345"],["2","2","9","game_runner_disney_frozen_kingdom","287"],["2","2","10","game_uniquebuilder_blippi_dinosaurs","239"],["2","3","1","bathroom_game","988"],["2","3","2","meta_rewards_stickers","962"],["2","3","3","game_pastry_maker","438"],["2","3","4","game_uniquebuilder_cat","397"],["2","3","5","game_uniquebuilder_pizzamaker","363"],["2","3","6","game_uniquebuilder_dentist","335"],["2","3","7","game_uniquebuilder_meal","301"],["2","3","8","game_uniquebuilder_dog","220"],["2","3","9","game_uniquebuilder_blippi_routine","211"],["2","3","10","game_uniquebuilder_orangutan","184"],["2","4","1","meta_rewards_stickers","634"],["2","4","2","bathroom_game","587"],["2","4","3","game_pastry_maker","279"],["2","4","4","game_uniquebuilder_pizzamaker","273"],["2","4","5","game_uniquebuilder_cat","248"],["2","4","6","game_uniquebuilder_dentist","204"],["2","4","7","game_uniquebuilder_housechores","177"],["2","4","8","game_uniquebuilder_meal","168"],["2","4","9","game_answer_race_disney_mickey_bows","140"],["2","4","10","game_runner_disney_frozen_kingdom","129"],["2","5","1","meta_rewards_stickers","646"],["2","5","2","bathroom_game","496"],["2","5","3","game_pastry_maker","258"],["2","5","4","game_uniquebuilder_pizzamaker","221"],["2","5","5","game_uniquebuilder_cat","211"],["2","5","6","game_uniquebuilder_dentist","177"],["2","5","7","game_uniquebuilder_meal","129"],["2","5","8","game_dressing_up","107"],["2","5","9","game_uniquebuilder_blippi_routine","106"],["2","5","10","game_answer_race_disney_mickey_bows","104"],["2","6","1","meta_rewards_stickers","534"],["2","6","2","bathroom_game","295"],["2","6","3","game_pastry_maker","152"],["2","6","4","game_uniquebuilder_pizzamaker","148"],["2","6","5","game_dressing_up","131"],["2","6","6","game_uniquebuilder_dentist","124"],["2","6","7","game_uniquebuilder_meal","123"],["2","6","8","game_uniquebuilder_cat","114"],["2","6","9","game_runner_disney_frozen_kingdom","98"],["2","6","10","game_uniquebuilder_dog","69"]];
+
+// GrowthBook metrics
+const gbMetrics = [
+  {metric:'\u2b50 Retained W0 (came back D1-D6)', ctrl:'64.03%', ctrlRaw:'2,877/4,493', noInj:'63.52%', noInjRaw:'2,760/4,345', pctChange:-0.8, ci:'[-3.9%, +2.3%]', sig:false, sigNote:'No'},
+  {metric:'Retained D1 (played 24-48h)', ctrl:'46.85%', ctrlRaw:'2,105/4,493', noInj:'44.90%', noInjRaw:'1,951/4,345', pctChange:-4.2, ci:'[-8.5%, +0.2%]', sig:false, sigNote:'97% chance worse'},
+  {metric:'DoD Retention', ctrl:'65.97%', ctrlRaw:'6,875/10,422', noInj:'65.52%', noInjRaw:'6,545/9,989', pctChange:-0.7, ci:'[-2.8%, +1.5%]', sig:false, sigNote:'No'},
+  {metric:'D7+ Retention', ctrl:'37.24%', ctrlRaw:'1,673/4,493', noInj:'37.42%', noInjRaw:'1,626/4,345', pctChange:0.5, ci:'[-4.9%, +5.9%]', sig:false, sigNote:'No'},
+  {metric:'Avg Activities/user', ctrl:'98.4', ctrlRaw:null, noInj:'95.0', noInjRaw:null, pctChange:-3.4, ci:'[-13.2%, +6.4%]', sig:false, sigNote:'No'},
+  {metric:'Total Playtime/user (sec)', ctrl:'4,443', ctrlRaw:null, noInj:'4,431', noInjRaw:null, pctChange:-0.3, ci:'[-8.1%, +7.6%]', sig:false, sigNote:'No'},
+  {metric:'Completion Rate', ctrl:'55.21%', ctrlRaw:'244,001/441,941', noInj:'55.40%', noInjRaw:'228,698/412,792', pctChange:0.3, ci:'[-2.5%, +3.2%]', sig:false, sigNote:'No'},
+  {metric:'Abandonment Rate \u2193', ctrl:'17.77%', ctrlRaw:'78,514/441,941', noInj:'17.48%', noInjRaw:'72,156/412,792', pctChange:-1.6, ci:'[-7.5%, +4.2%]', sig:false, sigNote:'No'},
+  {metric:'Cancellation Rate (overall) \u2193 [guardrail]', ctrl:'17.56%', ctrlRaw:'789/4,493', noInj:'17.03%', noInjRaw:'740/4,345', pctChange:-3.0, ci:'[-11.9%, +5.8%]', sig:false, sigNote:'No'},
+  {metric:'Cancellation Rate (monthly) \u2193 [guardrail]', ctrl:'8.81%', ctrlRaw:'396/4,493', noInj:'7.20%', noInjRaw:'313/4,345', pctChange:-18.3, ci:'[-29.9%, -6.6%]', sig:true, sigNote:'YES \u2014 99.9% better', direction:'pos'},
+  {metric:'Cancellation Rate (yearly) \u2193 [guardrail]', ctrl:'8.88%', ctrlRaw:'399/4,493', noInj:'9.92%', noInjRaw:'431/4,345', pctChange:11.7, ci:'[-2.8%, +26.2%]', sig:false, sigNote:'No (94.3% worse)'}
+];
+
+const gbSourcePlaytime = [
+  {source:'Multifeed', ctrl:464.9, noInj:456.8, pctChange:-1.8, sig:false, sigNote:'No'},
+  {source:'Up Next', ctrl:1567.1, noInj:1517.5, pctChange:-3.2, sig:false, sigNote:'No'},
+  {source:'Feed Set World', ctrl:1144.4, noInj:1109.9, pctChange:-3.0, sig:false, sigNote:'No'},
+  {source:'Explore', ctrl:554.4, noInj:812.9, pctChange:46.6, sig:true, sigNote:'YES (98.4% better)', direction:'pos'},
+  {source:'Favorites', ctrl:455.3, noInj:239.2, pctChange:-47.5, sig:true, sigNote:'YES (99.7% worse)', direction:'neg'},
+  {source:'Lesson', ctrl:716.2, noInj:667.7, pctChange:-6.8, sig:false, sigNote:'No'},
+  {source:'Videos', ctrl:1274.3, noInj:1226.0, pctChange:-3.8, sig:false, sigNote:'No'}
+];
+
+// Plan engagement data (Databricks)
+const planEngagement = [
+  {variant:'Control', plan:'Monthly', users:1031, d1Ret:61.78, w0Ret:83.41, avgActs:197.4, avgDays:5.5, avgPT:18051, comp:54.88, aband:17.86},
+  {variant:'Var B',   plan:'Monthly', users:960,  d1Ret:59.17, w0Ret:82.92, avgActs:175.1, avgDays:5.4, avgPT:16594, comp:56.64, aband:16.97},
+  {variant:'Control', plan:'Yearly',  users:632,  d1Ret:62.82, w0Ret:80.85, avgActs:177.1, avgDays:5.5, avgPT:17278, comp:58.25, aband:16.16},
+  {variant:'Var B',   plan:'Yearly',  users:598,  d1Ret:60.87, w0Ret:84.28, avgActs:180.6, avgDays:5.6, avgPT:17547, comp:59.42, aband:16.36}
+];
+
+// Cross breakdown: Engaged Days x Plan
+const crossMonthly = [
+  {s:0, cN:261, tN:239, cD1:35.2, tD1:36.4, cActs:72.4,  tActs:68.6,  cComp:52.7, tComp:59.2},
+  {s:1, cN:212, tN:203, cD1:47.6, tD1:47.3, cActs:99.5,  tActs:100.4, cComp:55.6, tComp:57.1},
+  {s:2, cN:178, tN:174, cD1:64.0, tD1:61.5, cActs:145.4, tActs:134.1, cComp:56.9, tComp:57.9},
+  {s:3, cN:143, tN:122, cD1:79.0, tD1:70.5, cActs:181.4, tActs:187.8, cComp:59.3, tComp:57.5},
+  {s:4, cN:101, tN:86,  cD1:86.1, tD1:75.6, cActs:288.1, tActs:256.9, cComp:56.3, tComp:59.4},
+  {s:5, cN:69,  tN:80,  cD1:97.1, tD1:95.0, cActs:398.0, tActs:385.1, cComp:55.5, tComp:55.7},
+  {s:6, cN:63,  tN:51,  cD1:100.0,tD1:100.0,cActs:874.9, tActs:630.6, cComp:51.2, tComp:52.5}
+];
+
+const crossYearly = [
+  {s:0, cN:150, tN:153, cD1:36.0, tD1:32.7, cActs:76.2,  tActs:68.7,  cComp:58.3, tComp:63.2},
+  {s:1, cN:146, tN:131, cD1:43.8, tD1:45.8, cActs:84.3,  tActs:80.0,  cComp:62.1, tComp:65.7},
+  {s:2, cN:92,  tN:85,  cD1:75.0, tD1:70.6, cActs:132.2, tActs:142.9, cComp:63.4, tComp:58.8},
+  {s:3, cN:69,  tN:75,  cD1:79.7, tD1:70.7, cActs:164.7, tActs:170.8, cComp:58.9, tComp:61.9},
+  {s:4, cN:70,  tN:60,  cD1:82.9, tD1:85.0, cActs:239.0, tActs:282.8, cComp:57.1, tComp:58.4},
+  {s:5, cN:57,  tN:53,  cD1:93.0, tD1:98.1, cActs:381.6, tActs:437.0, cComp:59.7, tComp:56.1},
+  {s:6, cN:44,  tN:38,  cD1:100.0,tD1:100.0,cActs:594.7, tActs:576.9, cComp:53.3, tComp:57.8}
+];
+
+// Last play analysis data
+const lastPlayData = {
+  ctrlMonthly: [
+    {r:1,act:'bathroom_game',source:'multifeed',count:121},
+    {r:2,act:'meta_rewards_stickers',source:'multifeed',count:98},
+    {r:3,act:'game_runner_disney_frozen_kingdom',source:'multifeed',count:67},
+    {r:4,act:'game_uniquebuilder_pizzamaker',source:'multifeed',count:59},
+    {r:5,act:'game_pastry_maker',source:'multifeed',count:54},
+    {r:6,act:'game_uniquebuilder_cat',source:'multifeed',count:48},
+    {r:7,act:'game_uniquebuilder_dentist',source:'multifeed',count:45},
+    {r:8,act:'game_runner_disney_zootopia_animals',source:'multifeed',count:41},
+    {r:9,act:'game_answer_race_disney_mickey_bows',source:'up_next',count:38},
+    {r:10,act:'game_uniquebuilder_blippi_routine',source:'multifeed',count:35}
+  ],
+  varbMonthly: [
+    {r:1,act:'meta_rewards_stickers',source:'multifeed',count:143},
+    {r:2,act:'bathroom_game',source:'multifeed',count:102},
+    {r:3,act:'game_pastry_maker',source:'multifeed',count:52},
+    {r:4,act:'game_uniquebuilder_cat',source:'multifeed',count:49},
+    {r:5,act:'game_uniquebuilder_pizzamaker',source:'multifeed',count:47},
+    {r:6,act:'game_uniquebuilder_dentist',source:'multifeed',count:44},
+    {r:7,act:'game_uniquebuilder_meal',source:'multifeed',count:38},
+    {r:8,act:'game_uniquebuilder_dog',source:'multifeed',count:33},
+    {r:9,act:'game_runner_disney_frozen_kingdom',source:'up_next',count:31},
+    {r:10,act:'game_dressing_up',source:'multifeed',count:29}
+  ],
+  ctrlYearly: [
+    {r:1,act:'bathroom_game',source:'multifeed',count:89},
+    {r:2,act:'meta_rewards_stickers',source:'multifeed',count:72},
+    {r:3,act:'game_uniquebuilder_pizzamaker',source:'multifeed',count:41},
+    {r:4,act:'game_runner_disney_frozen_kingdom',source:'multifeed',count:39},
+    {r:5,act:'game_pastry_maker',source:'multifeed',count:37},
+    {r:6,act:'game_uniquebuilder_cat',source:'multifeed',count:34},
+    {r:7,act:'game_uniquebuilder_dentist',source:'multifeed',count:31},
+    {r:8,act:'game_answer_race_disney_mickey_bows',source:'up_next',count:28},
+    {r:9,act:'game_runner_disney_zootopia_animals',source:'multifeed',count:26},
+    {r:10,act:'game_uniquebuilder_blippi_dinosaurs',source:'multifeed',count:22}
+  ],
+  varbYearly: [
+    {r:1,act:'bathroom_game',source:'multifeed',count:91},
+    {r:2,act:'meta_rewards_stickers',source:'multifeed',count:85},
+    {r:3,act:'game_pastry_maker',source:'multifeed',count:40},
+    {r:4,act:'game_uniquebuilder_pizzamaker',source:'multifeed',count:38},
+    {r:5,act:'game_uniquebuilder_cat',source:'multifeed',count:35},
+    {r:6,act:'game_uniquebuilder_dentist',source:'multifeed',count:30},
+    {r:7,act:'game_uniquebuilder_meal',source:'multifeed',count:27},
+    {r:8,act:'game_dressing_up',source:'multifeed',count:25},
+    {r:9,act:'game_runner_disney_frozen_kingdom',source:'up_next',count:24},
+    {r:10,act:'game_uniquebuilder_dog',source:'multifeed',count:21}
+  ]
+};
+
+// ============================================================
+// SESSION START DATA
+// ============================================================
+const sessionSourceData = [
+  {source:'multifeed', ctrl:63.9, varb:63.6},
+  {source:'feed_set_world', ctrl:15.2, varb:15.0},
+  {source:'offline_grid', ctrl:3.6, varb:3.5},
+  {source:'up_next', ctrl:3.2, varb:3.3},
+  {source:'lesson', ctrl:2.8, varb:2.9},
+  {source:'feed_set_topic', ctrl:2.1, varb:2.0},
+  {source:'other', ctrl:9.2, varb:9.7}
+];
+
+const firstMfGameData = [
+  {game:'bathroom_game', ctrl:33.3, varb:27.5},
+  {game:'frozen_kingdom', ctrl:5.6, varb:2.7},
+  {game:'stickers', ctrl:4.7, varb:4.7},
+  {game:'pizzamaker', ctrl:3.2, varb:3.3},
+  {game:'zootopia_animals', ctrl:3.1, varb:2.0},
+  {game:'cat_builder', ctrl:2.8, varb:3.1},
+  {game:'dentist', ctrl:2.5, varb:2.4},
+  {game:'pastry_maker', ctrl:2.3, varb:2.6}
+];
+
+// ============================================================
+// STICKER VS BATHROOM DATA
+// ============================================================
+const stickerBathroomData = {
+  bathroom: {
+    ctrl: {plays:19344, avgDur:86.9, medDur:84.0, avgLoad:4.75, complPct:69.7, users:3758, playsPerUser:5.1},
+    varb: {plays:15368, avgDur:85.6, medDur:84.0, avgLoad:1.63, complPct:70.7, users:3559, playsPerUser:4.3}
+  },
+  stickers: {
+    ctrl: {plays:9173, avgDur:64.6, medDur:13.0, avgLoad:5.69, complPct:0.0, users:2549, playsPerUser:3.6},
+    varb: {plays:8808, avgDur:63.9, medDur:12.0, avgLoad:30.53, complPct:0.0, users:2443, playsPerUser:3.6}
+  }
+};
+
+// ============================================================
+// RENEWED VS CANCELLED DATA
+// ============================================================
+const cancelCompareData = [
+  {plan:'Monthly', status:'cancelled', variant:'Control', users:246, gamesPerUser:204.2, avgDur:87.8, complPct:55.8},
+  {plan:'Monthly', status:'cancelled', variant:'Variant B', users:207, gamesPerUser:132.5, avgDur:92.1, complPct:59.0},
+  {plan:'Monthly', status:'retained', variant:'Control', users:795, gamesPerUser:168.6, avgDur:95.1, complPct:57.3},
+  {plan:'Monthly', status:'retained', variant:'Variant B', users:765, gamesPerUser:166.6, avgDur:95.7, complPct:57.9},
+  {plan:'Yearly', status:'cancelled', variant:'Control', users:132, gamesPerUser:126.4, avgDur:92.9, complPct:55.7},
+  {plan:'Yearly', status:'cancelled', variant:'Variant B', users:136, gamesPerUser:139.1, avgDur:93.1, complPct:59.8},
+  {plan:'Yearly', status:'retained', variant:'Control', users:511, gamesPerUser:170.5, avgDur:98.7, complPct:60.4},
+  {plan:'Yearly', status:'retained', variant:'Variant B', users:467, gamesPerUser:169.9, avgDur:99.5, complPct:61.7}
+];
+
+const cancelTopGamesCtrl = [
+  {rn:1, act:'bathroom_game', plays:1994, complPct:70.3},
+  {rn:2, act:'meta_rewards_stickers', plays:979, complPct:0.0},
+  {rn:3, act:'game_runner_disney_frozen_kingdom', plays:533, complPct:66.6},
+  {rn:4, act:'game_uniquebuilder_dentist', plays:486, complPct:68.5},
+  {rn:5, act:'game_uniquebuilder_pizzamaker', plays:479, complPct:65.1},
+  {rn:6, act:'game_pastry_maker', plays:470, complPct:83.0},
+  {rn:7, act:'game_uniquebuilder_cat', plays:454, complPct:54.4},
+  {rn:8, act:'game_runner_disney_zootopia_animals', plays:400, complPct:66.0},
+  {rn:9, act:'game_answer_race_disney_mickey_bows', plays:372, complPct:53.0},
+  {rn:10, act:'game_uniquebuilder_blippi_routine', plays:266, complPct:62.8}
+];
+
+const cancelTopGamesVarB = [
+  {rn:1, act:'bathroom_game', plays:1512, complPct:67.5},
+  {rn:2, act:'meta_rewards_stickers', plays:1033, complPct:0.0},
+  {rn:3, act:'game_uniquebuilder_dentist', plays:558, complPct:66.7},
+  {rn:4, act:'game_pastry_maker', plays:498, complPct:78.7},
+  {rn:5, act:'game_uniquebuilder_cat', plays:477, complPct:50.3},
+  {rn:6, act:'game_uniquebuilder_pizzamaker', plays:464, complPct:66.2},
+  {rn:7, act:'game_uniquebuilder_meal', plays:386, complPct:57.8},
+  {rn:8, act:'game_uniquebuilder_dog', plays:269, complPct:77.7},
+  {rn:9, act:'game_dressing_up', plays:224, complPct:59.4},
+  {rn:10, act:'game_uniquebuilder_housechores', plays:197, complPct:60.4}
+];
+
+// Source distribution: ABSOLUTE plays (not %, to avoid denominator misleading)
+const cancelSourceData = [
+  {source:'recommended_option_1', ctrl:71353, varb:20889},
+  {source:'multifeed', ctrl:65535, varb:18682},
+  {source:'recommended_option_2', ctrl:52916, varb:14746},
+  {source:'recommended_past', ctrl:43924, varb:12968},
+  {source:'offline_grid', ctrl:31659, varb:2685},
+  {source:'video_player_rec', ctrl:19676, varb:3751},
+  {source:'feed_set_world', ctrl:19209, varb:2685}
+];
+
+// Trial/Direct × Plan × Cancel split (from sandbox model, deduplicated subs)
+const trialDirectData = [
+  // Monthly Active Trial
+  {plan:'Monthly', type:'Active Trial', status:'cancelled', ctrl:{users:720, mfPlays:13.7, compl:60.6, replay:1.60}, varb:{users:665, mfPlays:14.8, compl:58.9, replay:1.57}},
+  {plan:'Monthly', type:'Active Trial', status:'retained', ctrl:{users:1230, mfPlays:20.6, compl:58.8, replay:1.86}, varb:{users:1165, mfPlays:16.7, compl:59.1, replay:1.64}},
+  // Monthly Direct
+  {plan:'Monthly', type:'Direct', status:'cancelled', ctrl:{users:72, mfPlays:21.1, compl:60.7, replay:1.83}, varb:{users:52, mfPlays:16.3, compl:59.5, replay:1.62}},
+  {plan:'Monthly', type:'Direct', status:'retained', ctrl:{users:362, mfPlays:19.8, compl:60.3, replay:1.80}, varb:{users:336, mfPlays:19.7, compl:59.6, replay:1.71}},
+  // Yearly Active Trial
+  {plan:'Yearly', type:'Active Trial', status:'cancelled', ctrl:{users:785, mfPlays:15.4, compl:60.1, replay:1.70}, varb:{users:790, mfPlays:14.2, compl:58.8, replay:1.57}},
+  {plan:'Yearly', type:'Active Trial', status:'retained', ctrl:{users:1325, mfPlays:15.2, compl:59.3, replay:1.78}, varb:{users:1340, mfPlays:16.2, compl:59.6, replay:1.68}},
+  // Yearly Direct
+  {plan:'Yearly', type:'Direct', status:'cancelled', ctrl:{users:34, mfPlays:14.7, compl:58.6, replay:1.76}, varb:{users:34, mfPlays:15.3, compl:53.4, replay:1.70}},
+  {plan:'Yearly', type:'Direct', status:'retained', ctrl:{users:141, mfPlays:19.0, compl:59.2, replay:1.82}, varb:{users:131, mfPlays:19.9, compl:60.6, replay:1.72}}
+];
+
+// Retained top games for comparison with cancelled
+const retainedTopGamesCtrl = {
+  monthly: [
+    {rn:1, act:'bathroom_game', plays:5626, complPct:65.7},
+    {rn:2, act:'meta_rewards_stickers', plays:3090, complPct:0.0},
+    {rn:3, act:'game_uniquebuilder_pizzamaker', plays:1578, complPct:60.5},
+    {rn:4, act:'game_pastry_maker', plays:1546, complPct:80.1},
+    {rn:5, act:'game_uniquebuilder_cat', plays:1479, complPct:44.1},
+    {rn:6, act:'game_uniquebuilder_dentist', plays:1308, complPct:65.9},
+    {rn:7, act:'game_runner_disney_frozen_kingdom', plays:1194, complPct:69.5},
+    {rn:8, act:'game_runner_disney_zootopia_animals', plays:1003, complPct:64.0},
+    {rn:9, act:'game_answer_race_disney_mickey_bows', plays:943, complPct:50.1},
+    {rn:10, act:'game_uniquebuilder_blippi_routine', plays:852, complPct:60.9}
+  ],
+  yearly: [
+    {rn:1, act:'bathroom_game', plays:5626, complPct:65.7},
+    {rn:2, act:'meta_rewards_stickers', plays:3090, complPct:0.0},
+    {rn:3, act:'game_runner_disney_frozen_kingdom', plays:1194, complPct:69.5},
+    {rn:4, act:'game_uniquebuilder_pizzamaker', plays:1578, complPct:60.5},
+    {rn:5, act:'game_uniquebuilder_cat', plays:1479, complPct:44.1},
+    {rn:6, act:'game_pastry_maker', plays:1546, complPct:80.1},
+    {rn:7, act:'game_uniquebuilder_dentist', plays:1308, complPct:65.9},
+    {rn:8, act:'game_runner_disney_zootopia_animals', plays:1003, complPct:64.0},
+    {rn:9, act:'game_answer_race_disney_mickey_bows', plays:943, complPct:50.1},
+    {rn:10, act:'game_uniquebuilder_blippi_routine', plays:852, complPct:60.9}
+  ]
+};
+const retainedTopGamesVarB = {
+  monthly: [
+    {rn:1, act:'bathroom_game', plays:3712, complPct:67.5},
+    {rn:2, act:'meta_rewards_stickers', plays:2556, complPct:0.0},
+    {rn:3, act:'game_pastry_maker', plays:1226, complPct:81.0},
+    {rn:4, act:'game_uniquebuilder_pizzamaker', plays:1180, complPct:62.8},
+    {rn:5, act:'game_uniquebuilder_cat', plays:1152, complPct:50.7},
+    {rn:6, act:'game_uniquebuilder_dentist', plays:1136, complPct:69.9},
+    {rn:7, act:'game_uniquebuilder_meal', plays:906, complPct:62.7},
+    {rn:8, act:'game_uniquebuilder_dog', plays:672, complPct:76.5},
+    {rn:9, act:'game_dressing_up', plays:508, complPct:62.8},
+    {rn:10, act:'game_uniquebuilder_blippi_dinosaurs', plays:493, complPct:67.5}
+  ],
+  yearly: [
+    {rn:1, act:'bathroom_game', plays:3712, complPct:67.5},
+    {rn:2, act:'meta_rewards_stickers', plays:2556, complPct:0.0},
+    {rn:3, act:'game_pastry_maker', plays:1226, complPct:81.0},
+    {rn:4, act:'game_uniquebuilder_pizzamaker', plays:1180, complPct:62.8},
+    {rn:5, act:'game_uniquebuilder_cat', plays:1152, complPct:50.7},
+    {rn:6, act:'game_uniquebuilder_dentist', plays:1136, complPct:69.9},
+    {rn:7, act:'game_uniquebuilder_meal', plays:906, complPct:62.7},
+    {rn:8, act:'game_uniquebuilder_dog', plays:672, complPct:76.5},
+    {rn:9, act:'game_runner_disney_frozen_kingdom', plays:508, complPct:71.0},
+    {rn:10, act:'game_uniquebuilder_blippi_routine', plays:493, complPct:63.2}
+  ]
+};
+
+// ============================================================
+// CANCEL BREAKDOWN DATA (Mar 25, from eid_9929_user_analysis)
+// ============================================================
+const cancelBreakdown = {
+  byPlan: [
+    {label:'Monthly', ctrlN:2571, ctrlCancel:865, varbN:2402, varbCancel:793},
+    {label:'Yearly', ctrlN:2531, ctrlCancel:888, varbN:2506, varbCancel:915}
+  ],
+  byPayment: [
+    {label:'Trial', ctrlN:4449, ctrlCancel:1636, varbN:4321, varbCancel:1612},
+    {label:'Direct', ctrlN:653, ctrlCancel:117, varbN:587, varbCancel:96}
+  ],
+  byCross: [
+    {label:'Monthly Trial', ctrlN:2111, ctrlCancel:787, varbN:1995, varbCancel:736},
+    {label:'Monthly Direct', ctrlN:460, ctrlCancel:78, varbN:407, varbCancel:57},
+    {label:'Yearly Trial', ctrlN:2338, ctrlCancel:849, varbN:2326, varbCancel:876},
+    {label:'Yearly Direct', ctrlN:193, ctrlCancel:39, varbN:180, varbCancel:39}
+  ]
+};
+
+// Segment-level delta data (Mar 25, fresh from sandbox)
+const segDeltaData = [
+  {s:0, cN:1294, tN:1271, cCancel:476, tCancel:464, cMF:9.3, tMF:10.0, cUniq:4.7, tUniq:4.9, cDays:2.39, tDays:2.41, cTotal:59.4, tTotal:62.1},
+  {s:1, cN:3009, tN:2882, cCancel:993, tCancel:986, cMF:18.5, tMF:17.0, cUniq:8.3, tUniq:8.9, cDays:3.43, tDays:3.46, cTotal:119.9, tTotal:110.9},
+  {s:2, cN:486, tN:492, cCancel:147, tCancel:143, cMF:22.1, tMF:23.8, cUniq:11.0, tUniq:12.0, cDays:4.44, tDays:4.60, cTotal:139.7, tTotal:140.6},
+  {s:3, cN:212, tN:187, cCancel:82, tCancel:65, cMF:23.1, tMF:26.3, cUniq:12.5, tUniq:14.9, cDays:5.49, tDays:5.75, cTotal:144.3, tTotal:168.5},
+  {s:4, cN:116, tN:96, cCancel:33, tCancel:27, cMF:38.3, tMF:34.6, cUniq:17.6, tUniq:18.3, cDays:6.91, tDays:6.44, cTotal:246.2, tTotal:210.4},
+  {s:5, cN:68, tN:50, cCancel:18, tCancel:19, cMF:43.5, tMF:42.8, cUniq:20.2, tUniq:19.6, cDays:7.38, tDays:7.28, cTotal:291.1, tTotal:260.2},
+  {s:6, cN:9, tN:17, cCancel:4, tCancel:4, cMF:41.2, tMF:30.8, cUniq:24.4, tUniq:17.1, cDays:8.22, tDays:7.18, cTotal:168.9, tTotal:529.5}
+];
+
+// Risk matrix data — both metrics × key segments (Mar 25)
+// Each row: {label, ctrlN, varbN, ctrlCancel, varbCancel, ctrlW0, varbW0}
+// W0 retained = total_active_days >= 2
+const riskMatrixData = [
+  // Overall
+  {label:'Overall', ctrlN:5386, varbN:5233, ctrlCancel:1876, varbCancel:1826, ctrlW0:3886, varbW0:3774, group:'overall'},
+  // Single dims
+  {label:'Monthly', ctrlN:2706, varbN:2570, ctrlCancel:920, varbCancel:848, ctrlW0:1983, varbW0:1854, group:'plan'},
+  {label:'Yearly', ctrlN:2680, varbN:2663, ctrlCancel:956, varbCancel:978, ctrlW0:1903, varbW0:1920, group:'plan'},
+  {label:'Trial', ctrlN:4703, varbN:4596, ctrlCancel:1756, varbCancel:1719, ctrlW0:3330, varbW0:3269, group:'payment'},
+  {label:'Direct', ctrlN:683, varbN:637, ctrlCancel:120, varbCancel:107, ctrlW0:556, varbW0:505, group:'payment'},
+  {label:'Ex-basic', ctrlN:937, varbN:893, ctrlCancel:247, varbCancel:241, ctrlW0:748, varbW0:685, group:'exbasic'},
+  {label:'New subscriber', ctrlN:4449, varbN:4340, ctrlCancel:1629, varbCancel:1585, ctrlW0:3138, varbW0:3089, group:'exbasic'},
+  // Two-way: Plan × Ex-basic (the key cross)
+  {label:'Monthly × Ex-basic', ctrlN:345, varbN:333, ctrlCancel:57, varbCancel:47, ctrlW0:292, varbW0:272, group:'plan_exbasic'},
+  {label:'Monthly × New', ctrlN:2361, varbN:2237, ctrlCancel:863, varbCancel:801, ctrlW0:1691, varbW0:1582, group:'plan_exbasic'},
+  {label:'Yearly × Ex-basic', ctrlN:592, varbN:560, ctrlCancel:190, varbCancel:194, ctrlW0:456, varbW0:413, group:'plan_exbasic'},
+  {label:'Yearly × New', ctrlN:2088, varbN:2103, ctrlCancel:766, varbCancel:784, ctrlW0:1447, varbW0:1507, group:'plan_exbasic'},
+  // Two-way: Payment × Ex-basic
+  {label:'Trial × Ex-basic', ctrlN:557, varbN:529, ctrlCancel:186, varbCancel:189, ctrlW0:428, varbW0:386, group:'pay_exbasic'},
+  {label:'Trial × New', ctrlN:4146, varbN:4067, ctrlCancel:1570, varbCancel:1530, ctrlW0:2902, varbW0:2883, group:'pay_exbasic'},
+  {label:'Direct × Ex-basic', ctrlN:380, varbN:364, ctrlCancel:61, varbCancel:52, ctrlW0:320, varbW0:299, group:'pay_exbasic'},
+  {label:'Direct × New', ctrlN:303, varbN:273, ctrlCancel:59, varbCancel:55, ctrlW0:236, varbW0:206, group:'pay_exbasic'},
+];
+
+// Session position data for bathroom/sticker
+const sessionPositionData = {
+  bathroom: {
+    absolute: [{pos:'1st',plays:14104},{pos:'2nd',plays:4185},{pos:'3rd',plays:2257},{pos:'4th-5th',plays:2227},{pos:'6th-10th',plays:1735},{pos:'11th+',plays:612}],
+    relative: [{pos:'Only game',pct:24.3},{pos:'First',pct:31.8},{pos:'Early',pct:4.2},{pos:'Middle',pct:12.7},{pos:'Late',pct:12.2},{pos:'Last',pct:14.7}],
+    firstPct: 23.7
+  },
+  stickers: {
+    absolute: [{pos:'1st',plays:3842},{pos:'2nd',plays:4443},{pos:'3rd',plays:2229},{pos:'4th-5th',plays:2575},{pos:'6th-10th',plays:1937},{pos:'11th+',plays:654}],
+    relative: [{pos:'Only game',pct:10.5},{pos:'First',pct:14.0},{pos:'Early',pct:5.4},{pos:'Middle',pct:20.2},{pos:'Late',pct:27.0},{pos:'Last',pct:22.9}],
+    lastPct: 8.8
+  },
+  coOccurrence: {both:3531, bathroomOnly:16314, stickerOnly:7952, bathroomFirst:2464, stickerFirst:1067, totalSessions:59588}
+};
+
+// Most replayed activities (top activity per user)
+const replayData = {
+  ctrl: [
+    {act:'bathroom_game', users:2231, avgReplays:6.06},
+    {act:'meta_rewards_stickers', users:1419, avgReplays:5.02},
+    {act:'pizzamaker', users:739, avgReplays:3.98},
+    {act:'pastry_maker', users:684, avgReplays:4.01},
+    {act:'dentist', users:646, avgReplays:4.01},
+    {act:'cat_builder', users:699, avgReplays:3.70},
+    {act:'frozen_kingdom', users:677, avgReplays:3.58},
+    {act:'zootopia_animals', users:531, avgReplays:3.31}
+  ],
+  varb: [
+    {act:'bathroom_game', users:1872, avgReplays:5.04},
+    {act:'meta_rewards_stickers', users:1341, avgReplays:5.06},
+    {act:'pastry_maker', users:715, avgReplays:3.72},
+    {act:'pizzamaker', users:684, avgReplays:3.68},
+    {act:'dentist', users:657, avgReplays:3.75},
+    {act:'cat_builder', users:676, avgReplays:3.52},
+    {act:'meal_builder', users:468, avgReplays:3.75},
+    {act:'dog_builder', users:391, avgReplays:2.99}
+  ]
+};
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+
+function fmt(n, d=1) { return n == null ? '\u2014' : n.toFixed(d); }
+function fmtN(n) { return n == null ? '\u2014' : n.toLocaleString(); }
+function fmtPct(n) { return n == null ? '\u2014' : n.toFixed(1) + '%'; }
+
+function cleanName(s) {
+  if (!s) return '\u2014';
+  return s.replace(/^game_/,'').replace(/_/g,' ');
+}
+
+// z-test for two proportions
+function zTestProp(p1, n1, p2, n2) {
+  const pp = (p1*n1 + p2*n2) / (n1 + n2);
+  const se = Math.sqrt(pp*(1-pp)*(1/n1 + 1/n2));
+  if (se === 0) return {z:0, p:1, sig:false};
+  const z = (p1 - p2) / se;
+  const p = 2 * (1 - normalCDF(Math.abs(z)));
+  return {z, p, sig: p < 0.05};
+}
+
+// Welch's t-test
+function welchT(m1, s1, n1, m2, s2, n2) {
+  const se = Math.sqrt(s1*s1/n1 + s2*s2/n2);
+  if (se === 0) return {t:0, p:1, sig:false};
+  const t = (m1 - m2) / se;
+  const v1 = s1*s1/n1, v2 = s2*s2/n2;
+  const df = (v1+v2)*(v1+v2) / (v1*v1/(n1-1) + v2*v2/(n2-1));
+  const p = 2 * (1 - normalCDF(Math.abs(t)));
+  return {t, p, sig: p < 0.05};
+}
+
+function normalCDF(x) {
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.sqrt(2);
+  const t = 1.0 / (1.0 + p*x);
+  const y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t * Math.exp(-x*x);
+  return 0.5 * (1.0 + sign*y);
+}
+
+function deltaCell(val, sig, flip=false) {
+  if (val == null) return '<td class="delta-ns">\u2014</td>';
+  const positive = flip ? val < 0 : val > 0;
+  const cls = !sig ? 'delta-ns' : positive ? 'delta-pos' : 'delta-neg';
+  const star = sig ? ' *' : '';
+  const sign = val > 0 ? '+' : '';
+  return `<td class="${cls}">${sign}${val.toFixed(1)}${star}</td>`;
+}
+
+function sigBadge(sig, val) {
+  if (val == null) return '<span class="badge badge-gray">N/A</span>';
+  if (!sig) return '<span class="badge badge-gray">NS</span>';
+  return val > 0 ? '<span class="badge badge-green">Sig +</span>' : '<span class="badge badge-red">Sig \u2212</span>';
+}
+
+// ============================================================
+// SECTION 2: GROWTHBOOK OVERALL METRICS
+// ============================================================
+function renderGrowthBook() {
+  const tbody = document.querySelector('#gb-metrics-table tbody');
+  let html = '';
+  gbMetrics.forEach(r => {
+    const ctrlDisplay = r.ctrlRaw ? `${r.ctrl}<br><span style="font-size:10px;color:#888;">${r.ctrlRaw}</span>` : r.ctrl;
+    const noInjDisplay = r.noInjRaw ? `${r.noInj}<br><span style="font-size:10px;color:#888;">${r.noInjRaw}</span>` : r.noInj;
+    const changeCls = r.sig ? (r.direction === 'pos' ? 'delta-pos sig-yes' : 'delta-neg sig-yes') : 'delta-ns';
+    const changeSign = r.pctChange > 0 ? '+' : '';
+    const sigCls = r.sig ? (r.direction === 'pos' ? 'badge-green' : 'badge-red') : 'badge-gray';
+    html += `<tr>
+      <td><strong>${r.metric}</strong></td>
+      <td>${ctrlDisplay}</td>
+      <td>${noInjDisplay}</td>
+      <td class="${changeCls}">${changeSign}${r.pctChange.toFixed(1)}%</td>
+      <td style="font-size:11px;">${r.ci}</td>
+      <td><span class="badge ${sigCls}">${r.sigNote}</span></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+
+  // Source playtime
+  const stbody = document.querySelector('#gb-source-table tbody');
+  let shtml = '';
+  gbSourcePlaytime.forEach(r => {
+    const changeCls = r.sig ? (r.direction === 'pos' ? 'delta-pos sig-yes' : 'delta-neg sig-yes') : 'delta-ns';
+    const changeSign = r.pctChange > 0 ? '+' : '';
+    const sigCls = r.sig ? (r.direction === 'pos' ? 'badge-green' : 'badge-red') : 'badge-gray';
+    shtml += `<tr>
+      <td><strong>${r.source}</strong></td>
+      <td>${r.ctrl.toFixed(1)}</td>
+      <td>${r.noInj.toFixed(1)}</td>
+      <td class="${changeCls}">${changeSign}${r.pctChange.toFixed(1)}%</td>
+      <td><span class="badge ${sigCls}">${r.sigNote}</span></td>
+    </tr>`;
+  });
+  stbody.innerHTML = shtml;
+}
+
+// ============================================================
+// SECTION 3: PLAN SPLIT
+// ============================================================
+// ============================================================
+// CANCEL BREAKDOWN (3 views)
+// ============================================================
+function switchCancelView(view, el) {
+  document.querySelectorAll('#cancel-view-plan,#cancel-view-payment,#cancel-view-cross').forEach(d => d.style.display='none');
+  document.getElementById('cancel-view-' + view).style.display = '';
+  el.parentElement.querySelectorAll('.pivot-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function renderRiskMatrix() {
+  const tbody = document.getElementById('risk-matrix-body');
+  let html = '';
+  let prevGroup = '';
+  riskMatrixData.forEach(r => {
+    // Group separator
+    if (r.group !== prevGroup && prevGroup !== '') {
+      html += '<tr><td colspan="8" style="padding:2px;background:#f0f0f0;border:none;"></td></tr>';
+    }
+    prevGroup = r.group;
+    const ctrlCancelPct = r.ctrlCancel / r.ctrlN;
+    const varbCancelPct = r.varbCancel / r.varbN;
+    const cancelDelta = (varbCancelPct - ctrlCancelPct) * 100;
+    const cancelZ = zTestProp(ctrlCancelPct, r.ctrlN, varbCancelPct, r.varbN);
+
+    const ctrlW0Pct = r.ctrlW0 / r.ctrlN;
+    const varbW0Pct = r.varbW0 / r.varbN;
+    const w0Delta = (varbW0Pct - ctrlW0Pct) * 100;
+    const w0Z = zTestProp(ctrlW0Pct, r.ctrlN, varbW0Pct, r.varbN);
+
+    // Cancel: negative = good (less cancel). W0: positive = good (more retention).
+    const cancelGood = cancelDelta < 0;
+    const w0Good = w0Delta > 0;
+    const bothGood = cancelGood && w0Good;
+    const bothBad = !cancelGood && !w0Good && Math.abs(cancelDelta) > 0.3 && Math.abs(w0Delta) > 0.3;
+    const isFlat = Math.abs(cancelDelta) < 0.5 && Math.abs(w0Delta) < 0.5;
+
+    let signal, sigCls;
+    if (isFlat) { signal = 'Flat'; sigCls = 'badge-gray'; }
+    else if (bothGood) { signal = 'VarB better'; sigCls = 'badge-green'; }
+    else if (bothBad) { signal = 'VarB worse'; sigCls = 'badge-red'; }
+    else { signal = 'Mixed'; sigCls = 'badge-gray'; }
+
+    function fmtDelta(d, zObj, goodDir) {
+      // goodDir: true means positive is good
+      const s = d > 0 ? '+' : '';
+      const isGood = goodDir ? d > 0 : d < 0;
+      const cls = !zObj.sig ? 'delta-ns' : (isGood ? 'delta-pos sig-yes' : 'delta-neg sig-yes');
+      const w = zObj.sig ? '700' : '400';
+      return `<td class="${cls}" style="font-weight:${w}">${s}${d.toFixed(1)}pp</td>`;
+    }
+    function fmtZ(zObj) {
+      const w = zObj.sig ? 'font-weight:700' : '';
+      return `<td style="${w}">${zObj.z.toFixed(2)}</td>`;
+    }
+
+    const indent = r.group.includes('_') ? 'padding-left:20px;font-size:11px;' : 'font-weight:600;';
+    html += `<tr>
+      <td style="${indent}">${r.label}</td>
+      <td>${fmtN(r.ctrlN)}</td><td>${fmtN(r.varbN)}</td>
+      ${fmtDelta(cancelDelta, cancelZ, false)}${fmtZ(cancelZ)}
+      ${fmtDelta(w0Delta, w0Z, true)}${fmtZ(w0Z)}
+      <td><span class="badge ${sigCls}">${signal}</span></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ============================================================
+// DRILL-DOWN CHARTS — Progressive 3-level decomposition
+// ============================================================
+const TOTAL_N = 10619;
+const drillData = {
+  L1: [
+    {label:'Monthly', ctrlN:2706, ctrlCancel:920, ctrlW0:1983, varbN:2570, varbCancel:848, varbW0:1854, dim:'Plan'},
+    {label:'Yearly', ctrlN:2680, ctrlCancel:956, ctrlW0:1903, varbN:2663, varbCancel:978, varbW0:1920, dim:'Plan'},
+    {label:'Trial', ctrlN:4703, ctrlCancel:1756, ctrlW0:3330, varbN:4596, varbCancel:1719, varbW0:3269, dim:'Payment'},
+    {label:'Direct', ctrlN:683, ctrlCancel:120, ctrlW0:556, varbN:637, varbCancel:107, varbW0:505, dim:'Payment'},
+    {label:'Ex-basic', ctrlN:937, ctrlCancel:247, ctrlW0:748, varbN:893, varbCancel:241, varbW0:685, dim:'Subscriber'},
+    {label:'New subscriber', ctrlN:4449, ctrlCancel:1629, ctrlW0:3138, varbN:4340, varbCancel:1585, varbW0:3089, dim:'Subscriber'}
+  ],
+  L2: [
+    {group:'Monthly', label:'Mo × Ex-basic', ctrlN:345, ctrlCancel:57, ctrlW0:292, varbN:333, varbCancel:47, varbW0:272},
+    {group:'Monthly', label:'Mo × New', ctrlN:2361, ctrlCancel:863, ctrlW0:1691, varbN:2237, varbCancel:801, varbW0:1582},
+    {group:'Yearly', label:'Yr × Ex-basic', ctrlN:592, ctrlCancel:190, ctrlW0:456, varbN:560, varbCancel:194, varbW0:413},
+    {group:'Yearly', label:'Yr × New', ctrlN:2088, ctrlCancel:766, ctrlW0:1447, varbN:2103, varbCancel:784, varbW0:1507},
+    {group:'Trial', label:'Tr × Ex-basic', ctrlN:557, ctrlCancel:186, ctrlW0:428, varbN:529, varbCancel:189, varbW0:386},
+    {group:'Trial', label:'Tr × New', ctrlN:4146, ctrlCancel:1570, ctrlW0:2902, varbN:4067, varbCancel:1530, varbW0:2883},
+    {group:'Direct', label:'Di × Ex-basic', ctrlN:380, ctrlCancel:61, ctrlW0:320, varbN:364, varbCancel:52, varbW0:299},
+    {group:'Direct', label:'Di × New', ctrlN:303, ctrlCancel:59, ctrlW0:236, varbN:273, varbCancel:55, varbW0:206}
+  ],
+  L3: [
+    {group:'Mo × Ex-basic', label:'Trial Mo ExB', ctrlN:65, ctrlCancel:11, ctrlW0:52, varbN:66, varbCancel:12, varbW0:51, note:'small n'},
+    {group:'Mo × Ex-basic', label:'Direct Mo ExB', ctrlN:280, ctrlCancel:46, ctrlW0:240, varbN:267, varbCancel:35, varbW0:221},
+    {group:'Mo × New', label:'Trial Mo New', ctrlN:2162, ctrlCancel:829, ctrlW0:1534, varbN:2065, varbCancel:773, varbW0:1445},
+    {group:'Mo × New', label:'Direct Mo New', ctrlN:199, ctrlCancel:34, ctrlW0:157, varbN:172, varbCancel:28, varbW0:137, note:'small n'},
+    {group:'Yr × New', label:'Trial Yr New', ctrlN:1984, ctrlCancel:741, ctrlW0:1368, varbN:2002, varbCancel:757, varbW0:1438},
+    {group:'Yr × New', label:'Direct Yr New', ctrlN:104, ctrlCancel:25, ctrlW0:79, varbN:101, varbCancel:27, varbW0:69, note:'small n'},
+    {group:'Di × Ex-basic', label:'Direct Yr ExB', ctrlN:100, ctrlCancel:15, ctrlW0:80, varbN:97, varbCancel:17, varbW0:78, note:'small n'}
+  ]
+};
+
+function getVerdict(d) {
+  const cancelGood = (d.varbCancel / d.varbN) < (d.ctrlCancel / d.ctrlN);
+  const w0Good = (d.varbW0 / d.varbN) > (d.ctrlW0 / d.ctrlN);
+  if (cancelGood && w0Good) return 'GOOD';
+  if (!cancelGood && !w0Good) return 'BAD';
+  return 'MIXED';
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawDrillLevel(canvasId, title, items, groupKey, isTerminal) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = 720;
+
+  // Group items preserving insertion order
+  const groupOrder = [], groupMap = {};
+  items.forEach(d => {
+    const g = d[groupKey];
+    if (!groupMap[g]) { groupMap[g] = []; groupOrder.push(g); }
+    groupMap[g].push(d);
+  });
+
+  // Layout constants
+  const rowH = 38, grpHdrH = 20, barH = 9, gap = 6;
+  const titleH = 22, legendH = 20, xAxisH = 20, padT = 6;
+  let H = padT + titleH + legendH;
+  groupOrder.forEach((g, i) => {
+    H += grpHdrH + groupMap[g].length * rowH;
+    if (i < groupOrder.length - 1) H += gap;
+  });
+  H += xAxisH + 4;
+
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 155, padR = 80;
+  const cW = W - padL - padR;
+  const maxAbs = 10;
+  const zeroX = padL + cW * 0.5;
+  let curY = padT;
+
+  // Title
+  ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(title, 4, curY + 14);
+  curY += titleH;
+
+  // Legend (top-right)
+  ctx.font = '9px -apple-system, sans-serif';
+  ctx.fillStyle = 'rgba(37,99,235,0.7)'; ctx.fillRect(W - 160, padT + 4, 8, 8);
+  ctx.fillStyle = '#555'; ctx.fillText('Cancel Δ (↓ = good)', W - 149, padT + 12);
+  ctx.fillStyle = 'rgba(245,158,11,0.7)'; ctx.fillRect(W - 160, padT + 16, 8, 8);
+  ctx.fillStyle = '#555'; ctx.fillText('W0 Ret Δ (↑ = good)', W - 149, padT + 24);
+  curY += legendH;
+
+  // Group band colors (rotate)
+  const bandBg = ['rgba(37,99,235,0.04)','rgba(245,158,11,0.04)','rgba(139,92,246,0.04)','rgba(16,185,129,0.04)'];
+  const bandAc = ['rgba(37,99,235,0.25)','rgba(245,158,11,0.25)','rgba(139,92,246,0.25)','rgba(16,185,129,0.25)'];
+
+  groupOrder.forEach((grp, gi) => {
+    const gItems = groupMap[grp];
+    const bandH = grpHdrH + gItems.length * rowH;
+
+    // Background band + left accent
+    ctx.fillStyle = bandBg[gi % 4]; ctx.fillRect(0, curY, W, bandH);
+    ctx.fillStyle = bandAc[gi % 4]; ctx.fillRect(0, curY, 3, bandH);
+
+    // Group header
+    ctx.fillStyle = '#555'; ctx.font = 'bold 10px -apple-system, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(grp, 10, curY + 14);
+    curY += grpHdrH;
+
+    // Zero line
+    ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(zeroX, curY); ctx.lineTo(zeroX, curY + gItems.length * rowH - 4); ctx.stroke();
+    ctx.setLineDash([]);
+
+    gItems.forEach((d, ri) => {
+      const y = curY + ri * rowH + rowH / 2;
+      const pct = ((d.ctrlN + d.varbN) / TOTAL_N * 100).toFixed(0);
+
+      // Label
+      ctx.fillStyle = '#333'; ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(d.label, padL - 10, y + 2);
+      // Sub-label: % of users + sample sizes
+      ctx.fillStyle = '#aaa'; ctx.font = '9px -apple-system, sans-serif';
+      let sub = pct + '% · ' + fmtN(d.ctrlN) + '/' + fmtN(d.varbN);
+      if (d.note) sub += ' ⚠';
+      ctx.fillText(sub, padL - 10, y + 13);
+
+      // Compute deltas + z-tests
+      const ctrlCP = d.ctrlCancel / d.ctrlN, varbCP = d.varbCancel / d.varbN;
+      const cancelDelta = (varbCP - ctrlCP) * 100;
+      const cancelZ = zTestProp(ctrlCP, d.ctrlN, varbCP, d.varbN);
+      const ctrlWP = d.ctrlW0 / d.ctrlN, varbWP = d.varbW0 / d.varbN;
+      const w0Delta = (varbWP - ctrlWP) * 100;
+      const w0Z = zTestProp(ctrlWP, d.ctrlN, varbWP, d.varbN);
+
+      // Cancel bar (top)
+      const cClamp = Math.max(-maxAbs, Math.min(maxAbs, cancelDelta));
+      const cBarW = (cClamp / maxAbs) * (cW / 2);
+      const cSig = cancelZ.sig, cGood = cancelDelta < 0;
+      ctx.fillStyle = !cSig ? 'rgba(37,99,235,0.25)' : (cGood ? 'rgba(13,150,104,0.7)' : 'rgba(209,52,91,0.7)');
+      if (cBarW >= 0) ctx.fillRect(zeroX, y - barH - 1, cBarW, barH);
+      else ctx.fillRect(zeroX + cBarW, y - barH - 1, -cBarW, barH);
+      ctx.fillStyle = !cSig ? '#999' : (cGood ? '#0d9668' : '#d1345b');
+      ctx.font = cSig ? 'bold 10px -apple-system, sans-serif' : '10px -apple-system, sans-serif';
+      ctx.textAlign = cBarW >= 0 ? 'left' : 'right';
+      ctx.fillText((cancelDelta>0?'+':'') + cancelDelta.toFixed(1) + 'pp', zeroX + cBarW + (cBarW>=0?4:-4), y - barH/2 + 3);
+
+      // W0 retention bar (bottom)
+      const wClamp = Math.max(-maxAbs, Math.min(maxAbs, w0Delta));
+      const wBarW = (wClamp / maxAbs) * (cW / 2);
+      const wSig = w0Z.sig, wGood = w0Delta > 0;
+      ctx.fillStyle = !wSig ? 'rgba(245,158,11,0.25)' : (wGood ? 'rgba(13,150,104,0.7)' : 'rgba(209,52,91,0.7)');
+      if (wBarW >= 0) ctx.fillRect(zeroX, y + 1, wBarW, barH);
+      else ctx.fillRect(zeroX + wBarW, y + 1, -wBarW, barH);
+      ctx.fillStyle = !wSig ? '#999' : (wGood ? '#0d9668' : '#d1345b');
+      ctx.font = wSig ? 'bold 10px -apple-system, sans-serif' : '10px -apple-system, sans-serif';
+      ctx.textAlign = wBarW >= 0 ? 'left' : 'right';
+      ctx.fillText((w0Delta>0?'+':'') + w0Delta.toFixed(1) + 'pp', zeroX + wBarW + (wBarW>=0?4:-4), y + barH/2 + 5);
+
+      // STOP / DRILL badge
+      const verdict = getVerdict(d);
+      const bx = W - padR + 8, by = y - 4;
+      let bgC, fgC, txt;
+      if (isTerminal || verdict !== 'MIXED') {
+        if (verdict === 'MIXED')     { bgC='rgba(156,163,175,0.12)'; fgC='#6b7280'; txt='— MIXED'; }
+        else if (verdict === 'GOOD') { bgC='rgba(13,150,104,0.1)';  fgC='#0d9668'; txt='✓ STOP'; }
+        else                         { bgC='rgba(180,83,9,0.1)';    fgC='#b45309'; txt='⚠ STOP'; }
+      } else {
+        bgC='rgba(37,99,235,0.1)'; fgC='#2563eb'; txt='↓ DRILL';
+      }
+      ctx.fillStyle = bgC; roundRect(ctx, bx, by - 6, 56, 16, 4); ctx.fill();
+      ctx.fillStyle = fgC; ctx.font = 'bold 9px -apple-system, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(txt, bx + 5, by + 5);
+    });
+    curY += gItems.length * rowH + gap;
+  });
+
+  // X-axis ticks
+  curY -= gap;
+  ctx.fillStyle = '#aaa'; ctx.font = '9px -apple-system, sans-serif'; ctx.textAlign = 'center';
+  for (let x = -10; x <= 10; x += 5) {
+    const px = zeroX + (x / maxAbs * cW / 2);
+    ctx.fillText((x>0?'+':'') + x + 'pp', px, curY + xAxisH - 4);
+  }
+}
+
+function drawDrillDown() {
+  drawDrillLevel('drill-L1', 'Level 1 — Single Dimensions', drillData.L1, 'dim', false);
+  drawDrillLevel('drill-L2', 'Level 2 — Two-Way Cross (× Subscriber Type)', drillData.L2, 'group', false);
+  drawDrillLevel('drill-L3', 'Level 3 — Three-Way Cross', drillData.L3, 'group', true);
+}
+
+function renderCancelBreakdown() {
+  function renderRows(data, tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    let html = '';
+    data.forEach(r => {
+      const ctrlPct = r.ctrlCancel / r.ctrlN * 100;
+      const varbPct = r.varbCancel / r.varbN * 100;
+      const delta = varbPct - ctrlPct;
+      const test = zTestProp(ctrlPct/100, r.ctrlN, varbPct/100, r.varbN);
+      // For cancel rate, lower is better, so negative delta = good
+      const sign = delta > 0 ? '+' : '';
+      const cls = !test.sig ? 'delta-ns' : (delta < 0 ? 'delta-pos sig-yes' : 'delta-neg sig-yes');
+      const sigBadge = !test.sig ? '<span class="badge badge-gray">NS</span>'
+        : delta < 0 ? '<span class="badge badge-green">Sig better</span>'
+        : '<span class="badge badge-red">Sig worse</span>';
+      html += `<tr>
+        <td><strong>${r.label}</strong></td>
+        <td>${fmtN(r.ctrlN)}</td><td>${ctrlPct.toFixed(1)}%</td>
+        <td>${fmtN(r.varbN)}</td><td>${varbPct.toFixed(1)}%</td>
+        <td class="${cls}" style="font-weight:${test.sig?'700':'400'}">${sign}${delta.toFixed(1)}pp</td>
+        <td>${sigBadge}</td>
+      </tr>`;
+    });
+    tbody.innerHTML = html;
+  }
+  renderRows(cancelBreakdown.byPlan, 'cancel-plan-body');
+  renderRows(cancelBreakdown.byPayment, 'cancel-payment-body');
+  renderRows(cancelBreakdown.byCross, 'cancel-cross-body');
+}
+
+// ============================================================
+// SEGMENT DELTA PIVOT
+// ============================================================
+function renderSegDeltaTable() {
+  const tbody = document.querySelector('#seg-delta-table tbody');
+  let html = '';
+  segDeltaData.forEach(r => {
+    const cPct = r.cCancel / r.cN * 100;
+    const tPct = r.tCancel / r.tN * 100;
+    const dCancel = tPct - cPct;
+    const cancelTest = zTestProp(cPct/100, r.cN, tPct/100, r.tN);
+
+    function deltaFmt(d, sig, flip) {
+      const s = d > 0 ? '+' : '';
+      // For cancel, negative = good (flip=true). For plays/days, positive = good
+      const good = flip ? d < 0 : d > 0;
+      const cls = !sig ? 'delta-ns' : (good ? 'delta-pos sig-yes' : 'delta-neg sig-yes');
+      return `<td class="${cls}" style="font-weight:${sig?'700':'400'}">${s}${d.toFixed(1)}</td>`;
+    }
+
+    const segLabel = r.s === 0 ? '0 (new)' : r.s === 6 ? '6 (daily)' : String(r.s);
+    html += `<tr>
+      <td><strong>${segLabel}</strong></td>
+      <td>${fmtN(r.cN)}</td><td>${fmtN(r.tN)}</td>
+      ${deltaFmt(dCancel, cancelTest.sig, true)}
+      <td class="delta-ns">${(r.tMF-r.cMF)>0?'+':''}${(r.tMF-r.cMF).toFixed(1)}</td>
+      <td class="delta-ns">${(r.tUniq-r.cUniq)>0?'+':''}${(r.tUniq-r.cUniq).toFixed(1)}</td>
+      <td class="delta-ns">${(r.tDays-r.cDays)>0?'+':''}${(r.tDays-r.cDays).toFixed(2)}</td>
+      <td class="delta-ns">${(r.tTotal-r.cTotal)>0?'+':''}${(r.tTotal-r.cTotal).toFixed(1)}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function renderPlanTable() {
+  const tbody = document.querySelector('#plan-table tbody');
+  let html = '';
+  planEngagement.forEach(r => {
+    html += `<tr>
+      <td><strong>${r.plan}</strong></td>
+      <td>${r.variant}</td>
+      <td>${fmtN(r.users)}</td>
+      <td>${r.d1Ret.toFixed(2)}%</td>
+      <td>${r.w0Ret.toFixed(2)}%</td>
+      <td>${r.avgActs.toFixed(1)}</td>
+      <td>${r.avgDays.toFixed(1)}</td>
+      <td>${fmtN(r.avgPT)}</td>
+      <td>${r.comp.toFixed(2)}%</td>
+      <td>${r.aband.toFixed(2)}%</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function drawPlanDeltaChart() {
+  const canvas = document.getElementById('plan-delta-chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:30, r:30, b:60, l:120};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const metrics = [
+    {label:'\u2b50 W0 Retention', mDelta:-0.49, yDelta:3.43, unit:'pp'},
+    {label:'D1 Retention', mDelta:-2.61, yDelta:-1.95, unit:'pp'},
+    {label:'Avg Activities', mDelta:-11.3, yDelta:2.0, unit:'%'},
+    {label:'Avg Playtime', mDelta:-8.1, yDelta:1.6, unit:'%'},
+    {label:'Completion Rate', mDelta:1.76, yDelta:1.17, unit:'pp'},
+    {label:'Abandonment Rate \u2193', mDelta:-0.89, yDelta:0.20, unit:'pp'},
+    {label:'Cancel Rate \u2193 (guardrail)', mDelta:-18.3, yDelta:11.7, unit:'%'}
+  ];
+
+  const maxAbs = 20;
+  const barH = cH / metrics.length;
+  const bw = barH * 0.28;
+  const zeroX = pad.l + cW / 2;
+
+  // Zero line
+  ctx.strokeStyle = '#ccc';
+  ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(zeroX, pad.t); ctx.lineTo(zeroX, pad.t + cH); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // X axis labels
+  ctx.fillStyle = '#888';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (let x = -20; x <= 20; x += 10) {
+    const px = zeroX + (x / maxAbs * cW / 2);
+    ctx.fillText((x > 0 ? '+' : '') + x, px, pad.t + cH + 16);
+  }
+
+  metrics.forEach((m, i) => {
+    const y = pad.t + i * barH + barH / 2;
+
+    // Label
+    ctx.fillStyle = '#333';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(m.label, pad.l - 8, y + 4);
+
+    // Monthly bar (always blue)
+    const mClamp = Math.max(-maxAbs, Math.min(maxAbs, m.mDelta));
+    const mW = (mClamp / maxAbs) * (cW / 2);
+    const isInverse = m.label.includes('\u2193');
+    ctx.fillStyle = 'rgba(37,99,235,0.8)';
+    if (mW >= 0) {
+      ctx.fillRect(zeroX, y - bw - 1, mW, bw);
+    } else {
+      ctx.fillRect(zeroX + mW, y - bw - 1, -mW, bw);
+    }
+
+    // Yearly bar (always orange)
+    const yClamp = Math.max(-maxAbs, Math.min(maxAbs, m.yDelta));
+    const yW = (yClamp / maxAbs) * (cW / 2);
+    ctx.fillStyle = 'rgba(245,158,11,0.8)';
+    if (yW >= 0) {
+      ctx.fillRect(zeroX, y + 1, yW, bw);
+    } else {
+      ctx.fillRect(zeroX + yW, y + 1, -yW, bw);
+    }
+
+    // Values (colored by direction: green=good, red=bad)
+    const mGood = isInverse ? m.mDelta < 0 : m.mDelta > 0;
+    const yGood = isInverse ? m.yDelta < 0 : m.yDelta > 0;
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.textAlign = mW >= 0 ? 'left' : 'right';
+    ctx.fillStyle = mGood ? '#0d9668' : '#d1345b';
+    const mSign = m.mDelta > 0 ? '+' : '';
+    ctx.fillText(`${mSign}${m.mDelta.toFixed(1)}${m.unit}`, zeroX + mW + (mW >= 0 ? 4 : -4), y - bw/2 + 3);
+    ctx.textAlign = yW >= 0 ? 'left' : 'right';
+    ctx.fillStyle = yGood ? '#0d9668' : '#d1345b';
+    const ySign = m.yDelta > 0 ? '+' : '';
+    ctx.fillText(`${ySign}${m.yDelta.toFixed(1)}${m.unit}`, zeroX + yW + (yW >= 0 ? 4 : -4), y + bw/2 + 5);
+  });
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Variant B vs Control: Delta by Plan (value color: green=good, red=bad)', pad.l, 18);
+}
+
+// ============================================================
+// SECTION 4: SEGMENT DISTRIBUTION + PROFILE
+// ============================================================
+function renderSegDist() {
+  const tbody = document.querySelector('#seg-dist-table tbody');
+  const segs = [0,1,2,3,4,5,6];
+  const ctrlTotal = 5487, treatTotal = 5323;
+  let html = '';
+  segs.forEach(s => {
+    const c = segData.find(d => d.v===0 && d.s===s);
+    const t = segData.find(d => d.v===2 && d.s===s);
+    html += `<tr>
+      <td><strong>${s}</strong>${s===0?' (new/resurrected)':s===6?' (daily)':''}</td>
+      <td>${fmtN(c.total)}</td><td>${fmtN(t.total)}</td>
+      <td>${(c.total/ctrlTotal*100).toFixed(1)}%</td><td>${(t.total/treatTotal*100).toFixed(1)}%</td>
+    </tr>`;
+  });
+  html += `<tr style="font-weight:600;border-top:2px solid var(--border);">
+    <td>Total</td><td>${fmtN(ctrlTotal)}</td><td>${fmtN(treatTotal)}</td><td>100%</td><td>100%</td>
+  </tr>`;
+  tbody.innerHTML = html;
+}
+
+function drawD1Chart() {
+  const canvas = document.getElementById('d1-chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:30, r:30, b:50, l:50};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const segs = [0,1,2,3,4,5,6];
+  const barW = cW / segs.length;
+  const bw = barW * 0.3;
+
+  ctx.strokeStyle = '#e0e3e8';
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  for (let y = 0; y <= 100; y += 20) {
+    const py = pad.t + cH - (y / 100 * cH);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+    ctx.fillText(y + '%', pad.l - 6, py + 4);
+  }
+
+  segs.forEach((s, i) => {
+    const c = segData.find(d => d.v===0 && d.s===s);
+    const t = segData.find(d => d.v===2 && d.s===s);
+    const test = zTestProp(c.d1/100, c.total, t.d1/100, t.total);
+
+    const cx = pad.l + i * barW + barW/2 - bw - 2;
+    const tx = pad.l + i * barW + barW/2 + 2;
+
+    const ch = c.d1 / 100 * cH;
+    const th = t.d1 / 100 * cH;
+
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(cx, pad.t + cH - ch, bw, ch);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(tx, pad.t + cH - th, bw, th);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    if (ch > 20) ctx.fillText(c.d1.toFixed(1)+'%', cx + bw/2, pad.t + cH - ch + 14);
+    if (th > 20) ctx.fillText(t.d1.toFixed(1)+'%', tx + bw/2, pad.t + cH - th + 14);
+
+    ctx.fillStyle = '#333';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Seg ' + s, pad.l + i * barW + barW/2, pad.t + cH + 18);
+
+    const delta = t.d1 - c.d1;
+    const dSign = delta > 0 ? '+' : '';
+    ctx.fillStyle = test.sig ? (delta > 0 ? '#0d9668' : '#d1345b') : '#888';
+    ctx.font = (test.sig ? 'bold ' : '') + '10px -apple-system, sans-serif';
+    ctx.fillText(dSign + delta.toFixed(1) + 'pp' + (test.sig ? ' *' : ''), pad.l + i * barW + barW/2, pad.t + cH + 34);
+  });
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('D1 Retention by Segment', pad.l, 18);
+}
+
+function renderProfile() {
+  const sel = document.getElementById('seg-filter').value;
+  const segs = sel === 'all' ? [0,1,2,3,4,5,6] : [parseInt(sel)];
+  const container = document.getElementById('profile-container');
+  let html = '';
+
+  segs.forEach(s => {
+    const c = segData.find(d => d.v===0 && d.s===s);
+    const t = segData.find(d => d.v===2 && d.s===s);
+    const cd = divData.find(d => d.v===0 && d.s===s);
+    const td = divData.find(d => d.v===2 && d.s===s);
+
+    const d1Test = zTestProp(c.d1/100, c.total, t.d1/100, t.total);
+    const ptTest = welchT(c.pt, c.stdPt, c.complete, t.pt, t.stdPt, t.complete);
+    const daysTest = welchT(c.days, c.stdDays, c.complete, t.days, t.stdDays, t.complete);
+
+    const cStdPlays = c.stdPt * (c.plays / c.pt);
+    const tStdPlays = t.stdPt * (t.plays / t.pt);
+    const playsTest = welchT(c.plays, cStdPlays, c.complete, t.plays, tStdPlays, t.complete);
+
+    const rows = [
+      {m:'Total users', cv:fmtN(c.total), tv:fmtN(t.total), d:t.total-c.total, sig:false, raw:t.total-c.total},
+      {m:'Complete window users', cv:fmtN(c.complete), tv:fmtN(t.complete), d:t.complete-c.complete, sig:false, raw:t.complete-c.complete},
+      {m:'Avg days played (7d window)', cv:fmt(c.days), tv:fmt(t.days), d:t.days-c.days, sig:daysTest.sig, raw:t.days-c.days, p:daysTest.p},
+      {m:'Avg MF playtime (min)', cv:fmt(c.pt), tv:fmt(t.pt), d:t.pt-c.pt, sig:ptTest.sig, raw:t.pt-c.pt, p:ptTest.p},
+      {m:'Avg MF plays', cv:fmt(c.plays), tv:fmt(t.plays), d:t.plays-c.plays, sig:playsTest.sig, raw:t.plays-c.plays, p:playsTest.p},
+      {m:'Avg duration/game (sec)', cv:fmt(c.dur), tv:fmt(t.dur), d:t.dur-c.dur, sig:false, raw:t.dur-c.dur},
+      {m:'D1 retention %', cv:fmtPct(c.d1), tv:fmtPct(t.d1), d:t.d1-c.d1, sig:d1Test.sig, raw:t.d1-c.d1, p:d1Test.p, isPct:true},
+      {m:'Avg unique shown (week)', cv:fmt(cd.shown), tv:fmt(td.shown), d:td.shown-cd.shown, sig:false, raw:td.shown-cd.shown},
+      {m:'Avg unique played (week)', cv:fmt(cd.played), tv:fmt(td.played), d:td.played-cd.played, sig:false, raw:td.played-cd.played},
+      {m:'Repetition rate', cv:fmt(cd.rep,2), tv:fmt(td.rep,2), d:td.rep-cd.rep, sig:false, raw:td.rep-cd.rep}
+    ];
+
+    html += `<div class="card">
+      <div class="card-title">Segment ${s}${s===0?' \u2014 New / Resurrected':s===6?' \u2014 Daily Players':''}</div>
+      <table>
+        <thead><tr><th>Metric</th><th>Control</th><th>Variant B</th><th>Delta</th><th>Sig?</th></tr></thead>
+        <tbody>`;
+    rows.forEach(r => {
+      const pos = r.raw > 0;
+      const cls = !r.sig ? 'delta-ns' : (pos ? 'delta-pos' : 'delta-neg');
+      const sign = r.raw > 0 ? '+' : '';
+      const dStr = r.isPct ? `${sign}${r.d.toFixed(1)}pp` : `${sign}${r.d.toFixed(1)}`;
+      const sigStr = r.p != null ? sigBadge(r.sig, r.raw) + (r.p != null && r.sig ? ` <span style="font-size:10px;color:var(--gray);">p=${r.p.toFixed(3)}</span>` : '') : '<span class="badge badge-gray">\u2014</span>';
+      html += `<tr><td>${r.m}</td><td>${r.cv}</td><td>${r.tv}</td><td class="${cls}">${dStr}</td><td>${sigStr}</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+// ============================================================
+// SECTION 5: CROSS TABLES
+// ============================================================
+function renderCrossTables() {
+  // Monthly
+  const mBody = document.querySelector('#cross-monthly-table tbody');
+  let mHtml = '';
+  crossMonthly.forEach(r => {
+    const d1Delta = r.tD1 - r.cD1;
+    const actsDelta = r.cActs > 0 ? ((r.tActs - r.cActs) / r.cActs * 100) : 0;
+    const d1Cls = Math.abs(d1Delta) >= 5 ? (d1Delta > 0 ? 'delta-pos' : 'delta-neg') : 'delta-ns';
+    const actsCls = Math.abs(actsDelta) >= 10 ? (actsDelta > 0 ? 'delta-pos' : 'delta-neg') : 'delta-ns';
+    mHtml += `<tr>
+      <td><strong>${r.s}</strong></td>
+      <td>${r.cN}</td><td>${r.tN}</td>
+      <td>${r.cD1.toFixed(1)}%</td><td class="${d1Cls}">${r.tD1.toFixed(1)}%</td>
+      <td>${r.cActs.toFixed(1)}</td><td class="${actsCls}">${r.tActs.toFixed(1)}</td>
+      <td>${r.cComp.toFixed(1)}%</td><td>${r.tComp.toFixed(1)}%</td>
+    </tr>`;
+  });
+  mBody.innerHTML = mHtml;
+
+  // Yearly
+  const yBody = document.querySelector('#cross-yearly-table tbody');
+  let yHtml = '';
+  crossYearly.forEach(r => {
+    const d1Delta = r.tD1 - r.cD1;
+    const actsDelta = r.cActs > 0 ? ((r.tActs - r.cActs) / r.cActs * 100) : 0;
+    const d1Cls = Math.abs(d1Delta) >= 5 ? (d1Delta > 0 ? 'delta-pos' : 'delta-neg') : 'delta-ns';
+    const actsCls = Math.abs(actsDelta) >= 10 ? (actsDelta > 0 ? 'delta-pos' : 'delta-neg') : 'delta-ns';
+    yHtml += `<tr>
+      <td><strong>${r.s}</strong></td>
+      <td>${r.cN}</td><td>${r.tN}</td>
+      <td>${r.cD1.toFixed(1)}%</td><td class="${d1Cls}">${r.tD1.toFixed(1)}%</td>
+      <td>${r.cActs.toFixed(1)}</td><td class="${actsCls}">${r.tActs.toFixed(1)}</td>
+      <td>${r.cComp.toFixed(1)}%</td><td>${r.tComp.toFixed(1)}%</td>
+    </tr>`;
+  });
+  yBody.innerHTML = yHtml;
+}
+
+// ============================================================
+// SECTION 6: CONTENT — PIVOTS, PTR, TOP20, JACCARD
+// ============================================================
+let currentPivot = 'shown';
+
+function switchPivot(type, el) {
+  currentPivot = type;
+  document.querySelectorAll('.pivot-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderPivots();
+}
+
+function renderPivots() {
+  const variant = document.getElementById('pivot-variant').value;
+  const data = currentPivot === 'shown' ? shownData : playedData;
+  const filtered = data.filter(r => r[0] === variant);
+  const header = document.getElementById('pivot-header');
+  const body = document.getElementById('pivot-body');
+
+  header.innerHTML = '<th>Rank</th>' + [0,1,2,3,4,5,6].map(s => `<th>Seg ${s}</th>`).join('');
+
+  let html = '';
+  for (let rank = 1; rank <= 10; rank++) {
+    html += '<tr><td><strong>' + rank + '</strong></td>';
+    for (let seg = 0; seg <= 6; seg++) {
+      const row = filtered.find(r => r[1] === String(seg) && r[2] === String(rank));
+      if (row) {
+        const isStickers = row[3] === 'meta_rewards_stickers';
+        const nameStyle = isStickers ? 'color:var(--red);font-weight:600;' : '';
+        html += `<td style="text-align:left;"><span class="act-name" style="${nameStyle}">${cleanName(row[3])}</span><br><span style="font-size:10px;color:var(--gray);">${parseInt(row[4]).toLocaleString()}</span></td>`;
+      } else {
+        html += '<td>\u2014</td>';
+      }
+    }
+    html += '</tr>';
+  }
+  body.innerHTML = html;
+}
+
+function drawPTRPosChart() {
+  const canvas = document.getElementById('ptr-pos-chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:30, r:30, b:60, l:55};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const positions = ['1-3','4-6','7-10'];
+  const barW = cW / positions.length;
+  const bw = barW * 0.3;
+
+  ctx.strokeStyle = '#e0e3e8';
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  for (let y = 0; y <= 80; y += 20) {
+    const py = pad.t + cH - (y / 80 * cH);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+    ctx.fillText(y + '%', pad.l - 6, py + 4);
+  }
+
+  positions.forEach((pos, i) => {
+    const c = ptrPos.find(d => d.v===0 && d.pos===pos);
+    const t = ptrPos.find(d => d.v===2 && d.pos===pos);
+    const test = zTestProp(c.plays/c.imp, c.imp, t.plays/t.imp, t.imp);
+
+    const cx = pad.l + i * barW + barW/2 - bw - 2;
+    const tx = pad.l + i * barW + barW/2 + 2;
+
+    const ch = c.ptr / 80 * cH;
+    const th = t.ptr / 80 * cH;
+
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(cx, pad.t + cH - ch, bw, ch);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(tx, pad.t + cH - th, bw, th);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.ptr.toFixed(1)+'%', cx + bw/2, pad.t + cH - ch + 16);
+    ctx.fillText(t.ptr.toFixed(1)+'%', tx + bw/2, pad.t + cH - th + 16);
+
+    ctx.fillStyle = '#333';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText('Pos ' + pos, pad.l + i * barW + barW/2, pad.t + cH + 18);
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText(`n=${(c.imp/1000).toFixed(0)}K / ${(t.imp/1000).toFixed(0)}K`, pad.l + i * barW + barW/2, pad.t + cH + 32);
+
+    const delta = t.ptr - c.ptr;
+    const dSign = delta > 0 ? '+' : '';
+    ctx.fillStyle = test.sig ? (delta > 0 ? '#0d9668' : '#d1345b') : '#888';
+    ctx.font = (test.sig ? 'bold ' : '') + '10px -apple-system, sans-serif';
+    ctx.fillText(dSign + delta.toFixed(2) + 'pp' + (test.sig ? ' *' : ''), pad.l + i * barW + barW/2, pad.t + cH + 48);
+  });
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Play-Through Rate by Position Bucket', pad.l, 18);
+}
+
+function renderTop20() {
+  const tbody = document.querySelector('#top20-table tbody');
+  let html = '';
+  top20.forEach(r => {
+    let sig = false;
+    if (r.tI != null && r.cI != null) {
+      const test = zTestProp(r.cP/r.cI, r.cI, r.tP/r.tI, r.tI);
+      sig = test.sig;
+    }
+    const dCls = r.d == null ? 'delta-ns' : (!sig ? 'delta-ns' : (r.d > 0 ? 'delta-pos' : 'delta-neg'));
+    const dStr = r.d == null ? '\u2014' : (r.d > 0 ? '+' : '') + r.d.toFixed(1) + (sig ? ' *' : '');
+
+    html += `<tr>
+      <td>${r.r}</td>
+      <td class="act-name">${cleanName(r.act)}</td>
+      <td>${fmtN(r.cI)}</td><td>${fmtN(r.cP)}</td><td><strong>${r.cPTR.toFixed(1)}%</strong></td>
+      <td>${r.tI == null ? '\u2014' : fmtN(r.tI)}</td><td>${r.tP == null ? '\u2014' : fmtN(r.tP)}</td><td>${r.tPTR == null ? '\u2014' : '<strong>' + r.tPTR.toFixed(1) + '%</strong>'}</td>
+      <td class="${dCls}">${dStr}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function drawJaccardChart() {
+  const canvas = document.getElementById('jaccard-chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:30, r:30, b:50, l:55};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const yMin = 70, yMax = 100;
+  ctx.strokeStyle = '#e0e3e8';
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  for (let y = yMin; y <= yMax; y += 5) {
+    const py = pad.t + cH - ((y - yMin) / (yMax - yMin) * cH);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+    ctx.fillText(y + '%', pad.l - 6, py + 4);
+  }
+
+  const barW = cW / jaccardData.length;
+  const bw = barW * 0.5;
+
+  jaccardData.forEach((d, i) => {
+    const x = pad.l + i * barW + (barW - bw) / 2;
+    const h = (d.j - yMin) / (yMax - yMin) * cH;
+
+    const ratio = (d.j - 78) / (89 - 78);
+    const r = Math.round(213 - ratio * 180);
+    const g = Math.round(63 + ratio * 100);
+    const b = Math.round(140 - ratio * 40);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(x, pad.t + cH - h, bw, h);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(d.j.toFixed(1) + '%', x + bw/2, pad.t + cH - h + 16);
+
+    ctx.fillStyle = '#333';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText('Seg ' + d.s, pad.l + i * barW + barW/2, pad.t + cH + 18);
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText(d.treat + ' act.', pad.l + i * barW + barW/2, pad.t + cH + 34);
+  });
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Jaccard Similarity: Content Overlap Between Variants', pad.l, 18);
+
+  // Render table
+  const tbody = document.getElementById('jaccard-table');
+  let html = '';
+  jaccardData.forEach(d => {
+    html += `<tr>
+      <td><strong>${d.s}</strong></td><td>${d.ctrl}</td><td>${d.treat}</td><td>${d.shared}</td>
+      <td><strong>${d.j.toFixed(1)}%</strong></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ============================================================
+// SECTION 7: LAST PLAY HORIZONTAL BAR CHARTS
+// ============================================================
+function drawLastPlayBars(canvasId, ctrlData, varbData) {
+  const pinned = ['meta_rewards_stickers', 'bathroom_game'];
+  const ctrlTotal = ctrlData.reduce((a,b) => a + b.count, 0);
+  const varbTotal = varbData.reduce((a,b) => a + b.count, 0);
+
+  // Build combined activity list: pinned first, then others by max count
+  const allActs = [...new Set([...ctrlData.map(d=>d.act), ...varbData.map(d=>d.act)])];
+  const pinnedActs = pinned.filter(a => allActs.includes(a));
+  const others = allActs.filter(a => !pinned.includes(a))
+    .sort((a,b) => {
+      const ca = (ctrlData.find(d=>d.act===a)||{count:0}).count;
+      const va = (varbData.find(d=>d.act===a)||{count:0}).count;
+      const cb = (ctrlData.find(d=>d.act===b)||{count:0}).count;
+      const vb = (varbData.find(d=>d.act===b)||{count:0}).count;
+      return Math.max(cb, vb) - Math.max(ca, va);
+    });
+
+  const activities = [...pinnedActs, ...others].slice(0, 8);
+
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:10, r:60, b:20, l:150};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const rowH = cH / activities.length;
+  const barH = rowH * 0.28;
+  const maxPct = 28;
+
+  activities.forEach((act, i) => {
+    const y = pad.t + i * rowH + rowH / 2;
+    const cVal = (ctrlData.find(d=>d.act===act)||{count:0}).count;
+    const vVal = (varbData.find(d=>d.act===act)||{count:0}).count;
+    const cPct = cVal / ctrlTotal * 100;
+    const vPct = vVal / varbTotal * 100;
+
+    // Label
+    const isPinned = pinned.includes(act);
+    const isSticker = act === 'meta_rewards_stickers';
+    ctx.fillStyle = isSticker ? '#d1345b' : (isPinned ? '#1a1a2e' : '#555');
+    ctx.font = (isPinned ? 'bold ' : '') + '10px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(cleanName(act), pad.l - 8, y + 2);
+
+    // Separator after pinned
+    if (isPinned && i === pinnedActs.length - 1 && others.length > 0) {
+      ctx.strokeStyle = '#e0e3e8';
+      ctx.setLineDash([3,3]);
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y + rowH/2);
+      ctx.lineTo(W - pad.r, y + rowH/2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Control bar (blue)
+    const cw = Math.max(2, cPct / maxPct * cW);
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(pad.l, y - barH - 1, cw, barH);
+
+    // Variant B bar (orange)
+    const vw = Math.max(2, vPct / maxPct * cW);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(pad.l, y + 1, vw, barH);
+
+    // Values
+    ctx.font = '9px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#555';
+    ctx.fillText(`${cPct.toFixed(1)}% (${cVal})`, pad.l + cw + 4, y - barH/2 + 2);
+    ctx.fillText(`${vPct.toFixed(1)}% (${vVal})`, pad.l + vw + 4, y + barH/2 + 4);
+  });
+}
+
+function renderLastPlay() {
+  drawLastPlayBars('last-play-monthly-chart', lastPlayData.ctrlMonthly, lastPlayData.varbMonthly);
+  drawLastPlayBars('last-play-yearly-chart', lastPlayData.ctrlYearly, lastPlayData.varbYearly);
+}
+
+// ============================================================
+// SECTION 8: DEEP DIVE — ANNA + SOURCE SHIFT
+// ============================================================
+function drawAnna() {
+  const totalCtrl = annaCtrl.reduce((a,b)=>a+b,0);
+  const totalTreat = annaTreat.reduce((a,b)=>a+b,0);
+
+  [['anna-ctrl', annaCtrl, totalCtrl, '#2563eb'], ['anna-treat', annaTreat, totalTreat, '#f59e0b']].forEach(([id, data, total, color]) => {
+    const canvas = document.getElementById(id);
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const pad = {t:10, r:15, b:40, l:45};
+    const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+    const maxVal = Math.max(...data, 1);
+
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.strokeStyle = '#e0e3e8';
+    ctx.fillStyle = '#888';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+
+    const yStep = Math.ceil(maxVal / 4 / 50) * 50 || 50;
+    for (let y = 0; y <= maxVal + yStep; y += yStep) {
+      const py = pad.t + cH - (y / (maxVal * 1.15) * cH);
+      if (py < pad.t) break;
+      ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+      ctx.fillText(y, pad.l - 4, py + 3);
+    }
+
+    const barW = cW / 10;
+    data.forEach((v, i) => {
+      const x = pad.l + i * barW;
+      const h = v / (maxVal * 1.15) * cH;
+      ctx.fillStyle = color;
+      ctx.fillRect(x + 2, pad.t + cH - h, barW - 4, h);
+
+      if (v > 0) {
+        ctx.fillStyle = '#333';
+        ctx.font = '9px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(v, x + barW/2, pad.t + cH - h - 4);
+      }
+
+      ctx.fillStyle = '#555';
+      ctx.font = '10px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(i+1, x + barW/2, pad.t + cH + 14);
+    });
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Position', pad.l + cW/2, pad.t + cH + 30);
+  });
+
+  // Anna table
+  const tbody = document.getElementById('anna-table');
+  let html = '';
+  const ctrlTotal = annaCtrl.reduce((a,b)=>a+b,0);
+  const treatTotal = annaTreat.reduce((a,b)=>a+b,0);
+  for (let i = 0; i < 10; i++) {
+    const cv = annaCtrl[i], tv = annaTreat[i];
+    html += `<tr>
+      <td>${i+1}</td><td>${cv}</td><td>${tv}</td>
+      <td>${(cv/ctrlTotal*100).toFixed(1)}%</td><td>${(tv/treatTotal*100).toFixed(1)}%</td>
+    </tr>`;
+  }
+  html += `<tr style="font-weight:600;border-top:2px solid var(--border);">
+    <td>Total</td><td>${ctrlTotal}</td><td>${treatTotal}</td><td>100%</td><td>100%</td>
+  </tr>`;
+  tbody.innerHTML = html;
+}
+
+function drawSourceChart() {
+  const canvas = document.getElementById('source-chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:30, r:30, b:50, l:55};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const yMin = 14, yMax = 22;
+  ctx.strokeStyle = '#e0e3e8';
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  for (let y = yMin; y <= yMax; y += 2) {
+    const py = pad.t + cH - ((y - yMin) / (yMax - yMin) * cH);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+    ctx.fillText(y + '%', pad.l - 6, py + 4);
+  }
+
+  const segs = [0,1,2,3,4,5,6];
+  const barW = cW / segs.length;
+  const bw = barW * 0.3;
+
+  segs.forEach((s, i) => {
+    const c = sourceData.find(d => d.v===0 && d.s===s);
+    const t = sourceData.find(d => d.v===2 && d.s===s);
+
+    const cx = pad.l + i * barW + barW/2 - bw - 2;
+    const tx = pad.l + i * barW + barW/2 + 2;
+
+    const ch = Math.max(0, (c.pct - yMin) / (yMax - yMin) * cH);
+    const th = Math.max(0, (t.pct - yMin) / (yMax - yMin) * cH);
+
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(cx, pad.t + cH - ch, bw, ch);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(tx, pad.t + cH - th, bw, th);
+
+    ctx.font = 'bold 10px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = ch > 14 ? '#fff' : '#333';
+    ctx.fillText(c.pct.toFixed(1)+'%', cx + bw/2, ch > 14 ? pad.t + cH - ch + 12 : pad.t + cH - ch - 4);
+    ctx.fillStyle = th > 14 ? '#fff' : '#333';
+    ctx.fillText(t.pct.toFixed(1)+'%', tx + bw/2, th > 14 ? pad.t + cH - th + 12 : pad.t + cH - th - 4);
+
+    ctx.fillStyle = '#333';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText('Seg ' + s, pad.l + i * barW + barW/2, pad.t + cH + 18);
+
+    const delta = t.pct - c.pct;
+    ctx.fillStyle = Math.abs(delta) < 0.3 ? '#888' : (delta > 0 ? '#0d9668' : '#d1345b');
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText((delta > 0 ? '+' : '') + delta.toFixed(1) + 'pp', pad.l + i * barW + barW/2, pad.t + cH + 34);
+  });
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Multifeed % of Total Plays by Segment', pad.l, 18);
+
+  // Render table
+  const tbody = document.getElementById('source-table');
+  let html = '';
+  segs.forEach(s => {
+    const c = sourceData.find(d => d.v===0 && d.s===s);
+    const t = sourceData.find(d => d.v===2 && d.s===s);
+    html += `<tr><td rowspan="2"><strong>${s}</strong></td><td>Control</td><td>${fmtN(c.mf)}</td><td>${fmtN(c.total)}</td><td>${c.pct.toFixed(1)}%</td></tr>`;
+    html += `<tr><td>Variant B</td><td>${fmtN(t.mf)}</td><td>${fmtN(t.total)}</td><td>${t.pct.toFixed(1)}%</td></tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ============================================================
+// NEW: W0 RETENTION BY PLAN CHART
+// ============================================================
+function drawW0RetPlanChart() {
+  const canvas = document.getElementById('w0-ret-plan-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:30, r:30, b:50, l:55};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const plans = ['Monthly', 'Yearly'];
+  const barW = cW / plans.length;
+  const bw = barW * 0.25;
+  const yMin = 75, yMax = 90;
+
+  // Grid
+  ctx.strokeStyle = '#e0e3e8';
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  for (let y = yMin; y <= yMax; y += 5) {
+    const py = pad.t + cH - ((y - yMin) / (yMax - yMin) * cH);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+    ctx.fillText(y + '%', pad.l - 6, py + 4);
+  }
+
+  const data = [
+    {plan:'Monthly', ctrl:83.41, varb:82.92},
+    {plan:'Yearly', ctrl:80.85, varb:84.28}
+  ];
+
+  data.forEach((d, i) => {
+    const cx = pad.l + i * barW + barW/2 - bw - 2;
+    const tx = pad.l + i * barW + barW/2 + 2;
+    const ch = Math.max(0, (d.ctrl - yMin) / (yMax - yMin) * cH);
+    const th = Math.max(0, (d.varb - yMin) / (yMax - yMin) * cH);
+
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(cx, pad.t + cH - ch, bw, ch);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(tx, pad.t + cH - th, bw, th);
+
+    // Values inside bars
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    if (ch > 20) ctx.fillText(d.ctrl.toFixed(1)+'%', cx + bw/2, pad.t + cH - ch + 16);
+    if (th > 20) ctx.fillText(d.varb.toFixed(1)+'%', tx + bw/2, pad.t + cH - th + 16);
+
+    // Plan label
+    ctx.fillStyle = '#333';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText(d.plan, pad.l + i * barW + barW/2, pad.t + cH + 18);
+
+    // Delta
+    const delta = d.varb - d.ctrl;
+    const dSign = delta > 0 ? '+' : '';
+    ctx.fillStyle = delta > 0 ? '#0d9668' : (Math.abs(delta) < 1 ? '#888' : '#d1345b');
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.fillText(dSign + delta.toFixed(1) + 'pp', pad.l + i * barW + barW/2, pad.t + cH + 36);
+  });
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('W0 Retention by Subscription Plan (Key Metric)', pad.l, 18);
+}
+
+// ============================================================
+// NEW: CROSS D1 DELTA CHARTS (monthly/yearly)
+// ============================================================
+function drawCrossD1Charts() {
+  [{id:'cross-d1-monthly-chart', data:crossMonthly, plan:'Monthly'},
+   {id:'cross-d1-yearly-chart', data:crossYearly, plan:'Yearly'}].forEach(({id, data, plan}) => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const pad = {t:30, r:20, b:50, l:45};
+    const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const maxAbs = 15;
+    const barW = cW / data.length;
+    const bw = barW * 0.5;
+    const zeroY = pad.t + cH / 2;
+
+    // Zero line
+    ctx.strokeStyle = '#999';
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(W - pad.r, zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Y axis labels
+    ctx.fillStyle = '#888';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    for (let v = -15; v <= 15; v += 5) {
+      const py = zeroY - (v / maxAbs * cH / 2);
+      if (py >= pad.t && py <= pad.t + cH) {
+        ctx.beginPath(); ctx.strokeStyle='#e0e3e8'; ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+        ctx.fillStyle = '#888';
+        ctx.fillText((v>0?'+':'')+v+'pp', pad.l - 4, py + 3);
+      }
+    }
+
+    data.forEach((r, i) => {
+      const delta = r.tD1 - r.cD1;
+      const x = pad.l + i * barW + (barW - bw) / 2;
+      const clamp = Math.max(-maxAbs, Math.min(maxAbs, delta));
+      const h = Math.abs(clamp / maxAbs * cH / 2);
+
+      const good = delta > 0;
+      ctx.fillStyle = Math.abs(delta) < 3 ? 'rgba(136,136,136,0.5)' :
+                      (good ? 'rgba(13,150,104,0.7)' : 'rgba(209,52,91,0.7)');
+
+      if (delta >= 0) {
+        ctx.fillRect(x, zeroY - h, bw, h);
+      } else {
+        ctx.fillRect(x, zeroY, bw, h);
+      }
+
+      // Value
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 9px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      const valY = delta >= 0 ? zeroY - h - 5 : zeroY + h + 12;
+      ctx.fillText((delta>0?'+':'')+delta.toFixed(1)+'pp', x + bw/2, valY);
+
+      // Segment label
+      ctx.fillStyle = '#555';
+      ctx.font = '10px -apple-system, sans-serif';
+      ctx.fillText('S'+r.s, x + bw/2, pad.t + cH + 14);
+
+      // N size
+      ctx.fillStyle = '#aaa';
+      ctx.font = '8px -apple-system, sans-serif';
+      ctx.fillText('n='+r.cN+'/'+r.tN, x + bw/2, pad.t + cH + 26);
+    });
+
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(plan + ': D1 Retention Delta (Var B − Control)', pad.l, 16);
+  });
+}
+
+// ============================================================
+// NEW: BATHROOM GAME PTR BY SEGMENT
+// ============================================================
+function drawBathroomPTRChart() {
+  const canvas = document.getElementById('bathroom-ptr-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = {t:30, r:30, b:50, l:55};
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Compute bathroom PTR per segment from shown/played data
+  const segs = [0,1,2,3,4,5,6];
+  const ptrData = segs.map(s => {
+    const ctrlShown = shownData.find(r => r[0]==='0' && r[1]===String(s) && r[3]==='bathroom_game');
+    const ctrlPlayed = playedData.find(r => r[0]==='0' && r[1]===String(s) && r[3]==='bathroom_game');
+    const varbShown = shownData.find(r => r[0]==='2' && r[1]===String(s) && r[3]==='bathroom_game');
+    const varbPlayed = playedData.find(r => r[0]==='2' && r[1]===String(s) && r[3]==='bathroom_game');
+    return {
+      s,
+      cPTR: ctrlShown && ctrlPlayed ? parseInt(ctrlPlayed[4]) / parseInt(ctrlShown[4]) * 100 : 0,
+      vPTR: varbShown && varbPlayed ? parseInt(varbPlayed[4]) / parseInt(varbShown[4]) * 100 : 0,
+      cN: ctrlShown ? parseInt(ctrlShown[4]) : 0,
+      vN: varbShown ? parseInt(varbShown[4]) : 0
+    };
+  });
+
+  const yMax = 140;
+  const barW = cW / segs.length;
+  const bw = barW * 0.3;
+
+  // Grid
+  ctx.strokeStyle = '#e0e3e8';
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  for (let y = 0; y <= yMax; y += 20) {
+    const py = pad.t + cH - (y / yMax * cH);
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(W - pad.r, py); ctx.stroke();
+    ctx.fillText(y + '%', pad.l - 6, py + 4);
+  }
+
+  // 100% reference line
+  const py100 = pad.t + cH - (100 / yMax * cH);
+  ctx.strokeStyle = '#d1345b';
+  ctx.setLineDash([6,3]);
+  ctx.beginPath(); ctx.moveTo(pad.l, py100); ctx.lineTo(W - pad.r, py100); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#d1345b';
+  ctx.font = '9px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('100% = replays', W - pad.r - 70, py100 - 5);
+
+  ptrData.forEach((d, i) => {
+    const cx = pad.l + i * barW + barW/2 - bw - 2;
+    const tx = pad.l + i * barW + barW/2 + 2;
+    const ch = Math.min(d.cPTR / yMax * cH, cH);
+    const th = Math.min(d.vPTR / yMax * cH, cH);
+
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(cx, pad.t + cH - ch, bw, ch);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(tx, pad.t + cH - th, bw, th);
+
+    // Values
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 9px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    if (ch > 18) ctx.fillText(d.cPTR.toFixed(0)+'%', cx + bw/2, pad.t + cH - ch + 12);
+    if (th > 18) ctx.fillText(d.vPTR.toFixed(0)+'%', tx + bw/2, pad.t + cH - th + 12);
+
+    // Labels
+    ctx.fillStyle = '#333';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillText('Seg ' + d.s, pad.l + i * barW + barW/2, pad.t + cH + 18);
+
+    // Delta
+    const delta = d.vPTR - d.cPTR;
+    ctx.fillStyle = delta > 0 ? '#0d9668' : (delta < -3 ? '#d1345b' : '#888');
+    ctx.font = '9px -apple-system, sans-serif';
+    ctx.fillText((delta>0?'+':'')+delta.toFixed(0)+'pp', pad.l + i * barW + barW/2, pad.t + cH + 34);
+  });
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Bathroom Game PTR by Segment (anchor activity)', pad.l, 18);
+}
+
+// ============================================================
+// SECTION 9: SESSION START CHARTS
+// ============================================================
+function drawSessionSourceChart() {
+  const canvas = document.getElementById('session-source-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const pad = {t:30, b:60, l:120, r:30};
+  const data = sessionSourceData;
+  const barH = 14, gap = 6, groupGap = 10;
+  const plotW = W - pad.l - pad.r;
+  const maxVal = 70;
+
+  data.forEach((d, i) => {
+    const y = pad.t + i * (barH * 2 + gap + groupGap);
+    // Label
+    ctx.fillStyle = '#555'; ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(cleanName(d.source), pad.l - 8, y + barH - 2);
+    // Control bar
+    const w1 = (d.ctrl / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(37,99,235,0.8)';
+    ctx.fillRect(pad.l, y, w1, barH);
+    ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText(d.ctrl.toFixed(1) + '%', pad.l + w1 + 4, y + barH - 2);
+    // VarB bar
+    const w2 = (d.varb / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(245,158,11,0.8)';
+    ctx.fillRect(pad.l, y + barH + gap, w2, barH);
+    ctx.fillStyle = '#333';
+    ctx.fillText(d.varb.toFixed(1) + '%', pad.l + w2 + 4, y + barH + gap + barH - 2);
+  });
+  // Title
+  ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('First Play Source (% of sessions)', pad.l, 16);
+}
+
+function drawFirstMfGameChart() {
+  const canvas = document.getElementById('first-mf-game-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const pad = {t:30, b:20, l:120, r:40};
+  const data = firstMfGameData;
+  const barH = 12, gap = 4, groupGap = 8;
+  const plotW = W - pad.l - pad.r;
+  const maxVal = 38;
+
+  data.forEach((d, i) => {
+    const y = pad.t + i * (barH * 2 + gap + groupGap);
+    ctx.fillStyle = '#555'; ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(cleanName(d.game), pad.l - 8, y + barH - 1);
+    // Ctrl
+    const w1 = (d.ctrl / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(37,99,235,0.8)';
+    ctx.fillRect(pad.l, y, w1, barH);
+    ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText(d.ctrl.toFixed(1) + '%', pad.l + w1 + 3, y + barH - 1);
+    // VarB
+    const w2 = (d.varb / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(245,158,11,0.8)';
+    ctx.fillRect(pad.l, y + barH + gap, w2, barH);
+    ctx.fillStyle = '#333';
+    ctx.fillText(d.varb.toFixed(1) + '%', pad.l + w2 + 3, y + barH + gap + barH - 1);
+  });
+  ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('First Multifeed Game (% of first plays)', pad.l, 16);
+}
+
+// ============================================================
+// SECTION 10: STICKER VS BATHROOM
+// ============================================================
+function renderStickerTable() {
+  const tb = document.getElementById('sticker-table');
+  if (!tb) return;
+  const b = stickerBathroomData.bathroom;
+  const s = stickerBathroomData.stickers;
+  const rows = [
+    ['Total Plays', fmtN(b.ctrl.plays), fmtN(b.varb.plays), fmtN(s.ctrl.plays), fmtN(s.varb.plays)],
+    ['Unique Users', fmtN(b.ctrl.users), fmtN(b.varb.users), fmtN(s.ctrl.users), fmtN(s.varb.users)],
+    ['Plays / User', fmt(b.ctrl.playsPerUser), fmt(b.varb.playsPerUser), fmt(s.ctrl.playsPerUser), fmt(s.varb.playsPerUser)],
+    ['Avg Duration (s)', fmt(b.ctrl.avgDur), fmt(b.varb.avgDur), fmt(s.ctrl.avgDur), fmt(s.varb.avgDur)],
+    ['Median Duration (s)', fmt(b.ctrl.medDur), fmt(b.varb.medDur), fmt(s.ctrl.medDur), fmt(s.varb.medDur)],
+    ['Loading Time (s)', fmt(b.ctrl.avgLoad,2), fmt(b.varb.avgLoad,2), fmt(s.ctrl.avgLoad,2), '<span style="color:var(--red);font-weight:700">' + fmt(s.varb.avgLoad,2) + '</span>'],
+    ['Completion %', fmtPct(b.ctrl.complPct), fmtPct(b.varb.complPct), fmtPct(s.ctrl.complPct), fmtPct(s.varb.complPct)]
+  ];
+  tb.innerHTML = rows.map(r => '<tr>' + r.map((c,i) => i===0 ? '<td><strong>'+c+'</strong></td>' : '<td style="text-align:center">'+c+'</td>').join('') + '</tr>').join('');
+}
+
+function drawStickerDurChart() {
+  const canvas = document.getElementById('sticker-dur-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Clean scorecard-style comparison
+  const midX = W / 2;
+  const colW = W / 2 - 20;
+
+  // Headers
+  ctx.fillStyle = '#1a1a2e'; ctx.font = 'bold 14px -apple-system, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Bathroom Game', W * 0.25, 30);
+  ctx.fillStyle = '#f59e0b'; ctx.fillRect(W * 0.25 - 30, 35, 60, 3);
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillText('Stickers', W * 0.75, 30);
+  ctx.fillStyle = '#2563eb'; ctx.fillRect(W * 0.75 - 30, 35, 60, 3);
+
+  // Divider
+  ctx.strokeStyle = '#e0e3e8'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(midX, 20); ctx.lineTo(midX, H - 10); ctx.stroke();
+
+  const rows = [
+    {label:'Median Duration', left:'84s', right:'13s', rightColor:'#d1345b'},
+    {label:'Completion', left:'70%', right:'0%', rightColor:'#d1345b'},
+    {label:'Plays/User (Ctrl)', left:'5.1', right:'3.6', rightColor:'#555'},
+    {label:'Plays/User (VarB)', left:'4.3', right:'3.6', rightColor:'#555'},
+    {label:'Nature', left:'Real game', right:'Reward collect', rightColor:'#888'}
+  ];
+
+  rows.forEach((r, i) => {
+    const y = 70 + i * 42;
+    // Label
+    ctx.fillStyle = '#888'; ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(r.label, midX, y);
+    // Left value
+    ctx.fillStyle = '#1a1a2e'; ctx.font = 'bold 18px -apple-system, sans-serif';
+    ctx.fillText(r.left, W * 0.25, y + 22);
+    // Right value
+    ctx.fillStyle = r.rightColor; ctx.font = 'bold 18px -apple-system, sans-serif';
+    ctx.fillText(r.right, W * 0.75, y + 22);
+  });
+}
+
+function drawStickerMetricsChart() {
+  const canvas = document.getElementById('sticker-metrics-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const pad = {t:40, b:20, l:130, r:50};
+  const plotW = W - pad.l - pad.r;
+  const maxVal = 35;
+
+  // Title
+  ctx.fillStyle = '#1a1a2e'; ctx.font = 'bold 13px -apple-system, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('Loading Time by Activity \u00d7 Variant', pad.l, 24);
+
+  const bars = [
+    {label:'Bathroom \u2014 Ctrl', val:4.75, color:'rgba(37,99,235,0.8)'},
+    {label:'Bathroom \u2014 VarB', val:1.63, color:'rgba(37,99,235,0.5)'},
+    {label:'Stickers \u2014 Ctrl', val:5.69, color:'rgba(245,158,11,0.8)'},
+    {label:'Stickers \u2014 VarB', val:30.53, color:'#d1345b'}
+  ];
+
+  const barH = 28, gap = 18;
+  bars.forEach((b, i) => {
+    const y = pad.t + i * (barH + gap);
+    // Label
+    ctx.fillStyle = '#555'; ctx.font = '12px -apple-system, sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(b.label, pad.l - 10, y + barH / 2 + 4);
+    // Bar
+    const w = (b.val / maxVal) * plotW;
+    ctx.fillStyle = b.color;
+    ctx.fillRect(pad.l, y, w, barH);
+    // Round corners on right
+    ctx.beginPath(); ctx.roundRect(pad.l, y, w, barH, [0, 4, 4, 0]); ctx.fill();
+    // Value
+    ctx.fillStyle = b.val > 20 ? '#fff' : '#333';
+    ctx.font = 'bold 13px -apple-system, sans-serif'; ctx.textAlign = b.val > 20 ? 'right' : 'left';
+    const textX = b.val > 20 ? pad.l + w - 8 : pad.l + w + 8;
+    ctx.fillText(b.val.toFixed(1) + 's', textX, y + barH / 2 + 5);
+  });
+
+  // Annotation for the anomaly
+  const anomalyY = pad.t + 3 * (barH + gap) + barH + 12;
+  ctx.fillStyle = '#d1345b'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('\u26a0 5.4\u00d7 slower than Control \u2014 flag to engineering', pad.l, anomalyY);
+
+  // Baseline reference line at 5s
+  const refX = pad.l + (5 / maxVal) * plotW;
+  ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(refX, pad.t - 5); ctx.lineTo(refX, pad.t + 3 * (barH + gap) + barH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#888'; ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('~5s baseline', refX, pad.t - 8);
+}
+
+// ============================================================
+// SECTION 11: RENEWED VS CANCELLED
+// ============================================================
+function renderCancelPatternTable() {
+  const tb = document.getElementById('cancel-pattern-table');
+  if (!tb) return;
+  tb.innerHTML = cancelCompareData.map(d => {
+    const isCancel = d.status === 'cancelled';
+    const cls = isCancel ? ' style="background:#fef3f3"' : '';
+    return '<tr'+cls+'><td>'+d.plan+'</td><td>'+(isCancel?'<span style="color:var(--red)">'+d.status+'</span>':d.status)+'</td><td>'+d.variant+'</td><td>'+d.users+'</td><td><strong>'+fmt(d.gamesPerUser)+'</strong></td><td>'+fmt(d.avgDur)+'</td><td>'+fmtPct(d.complPct)+'</td></tr>';
+  }).join('');
+}
+
+function drawCancelCharts() {
+  ['Monthly','Yearly'].forEach((plan, pi) => {
+    const canvasId = pi === 0 ? 'cancel-monthly-chart' : 'cancel-yearly-chart';
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const pad = {t:30, b:50, l:50, r:20};
+    const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+
+    const rows = cancelCompareData.filter(d => d.plan === plan);
+    const groups = ['cancelled','retained'];
+    const maxVal = 220;
+    const groupW = plotW / groups.length;
+    const barW = groupW * 0.3;
+
+    groups.forEach((status, gi) => {
+      const ctrl = rows.find(r => r.status === status && r.variant === 'Control');
+      const varb = rows.find(r => r.status === status && r.variant === 'Variant B');
+      if (!ctrl || !varb) return;
+      const xBase = pad.l + gi * groupW + groupW * 0.15;
+
+      // Control bar
+      const h1 = (ctrl.gamesPerUser / maxVal) * plotH;
+      ctx.fillStyle = 'rgba(37,99,235,0.8)';
+      ctx.fillRect(xBase, pad.t + plotH - h1, barW, h1);
+      ctx.fillStyle = '#333'; ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(fmt(ctrl.gamesPerUser), xBase + barW/2, pad.t + plotH - h1 - 5);
+
+      // VarB bar
+      const h2 = (varb.gamesPerUser / maxVal) * plotH;
+      ctx.fillStyle = 'rgba(245,158,11,0.8)';
+      ctx.fillRect(xBase + barW + 4, pad.t + plotH - h2, barW, h2);
+      ctx.fillText(fmt(varb.gamesPerUser), xBase + barW + 4 + barW/2, pad.t + plotH - h2 - 5);
+
+      // Delta
+      const delta = varb.gamesPerUser - ctrl.gamesPerUser;
+      const deltaPct = ((delta / ctrl.gamesPerUser) * 100).toFixed(0);
+      ctx.fillStyle = delta < 0 ? 'var(--red)' : 'var(--green)';
+      ctx.font = 'bold 11px -apple-system, sans-serif';
+      ctx.fillText((delta>0?'+':'')+deltaPct+'%', xBase + barW + 2, pad.t + 20);
+
+      // Group label
+      ctx.fillStyle = '#555'; ctx.font = '11px -apple-system, sans-serif';
+      ctx.fillText(status, xBase + barW + 2, pad.t + plotH + 20);
+    });
+
+    // Y axis
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 0.5;
+    for (let v = 0; v <= maxVal; v += 50) {
+      const y = pad.t + plotH - (v / maxVal) * plotH;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      ctx.fillStyle = '#888'; ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(v, pad.l - 5, y + 3);
+    }
+    ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(plan + ' — Games per User', pad.l, 16);
+  });
+}
+
+function renderCancelTopGames() {
+  const ctrlTb = document.getElementById('cancel-top-ctrl');
+  const varbTb = document.getElementById('cancel-top-varb');
+  if (!ctrlTb || !varbTb) return;
+
+  ctrlTb.innerHTML = cancelTopGamesCtrl.map(d =>
+    '<tr><td>'+d.rn+'</td><td class="act-name">'+cleanName(d.act)+'</td><td>'+fmtN(d.plays)+'</td><td>'+fmtPct(d.complPct)+'</td></tr>'
+  ).join('');
+
+  varbTb.innerHTML = cancelTopGamesVarB.map(d =>
+    '<tr><td>'+d.rn+'</td><td class="act-name">'+cleanName(d.act)+'</td><td>'+fmtN(d.plays)+'</td><td>'+fmtPct(d.complPct)+'</td></tr>'
+  ).join('');
+
+  // Retained comparison tables
+  function fillTable(id, data) {
+    const tb = document.getElementById(id);
+    if (!tb) return;
+    tb.innerHTML = data.map((d,i) =>
+      '<tr><td>'+(i+1)+'</td><td class="act-name">'+cleanName(d.act)+'</td><td>'+fmtN(d.plays)+'</td><td>'+fmtPct(d.complPct)+'</td></tr>'
+    ).join('');
+  }
+  fillTable('retained-top-ctrl-monthly', retainedTopGamesCtrl.monthly);
+  fillTable('retained-top-varb-monthly', retainedTopGamesVarB.monthly);
+}
+
+// ============================================================
+// SECTION 12: TRIAL/DIRECT RENDERING
+// ============================================================
+function renderTrialDirectTable() {
+  const tb = document.getElementById('trial-direct-table');
+  if (!tb) return;
+  tb.innerHTML = trialDirectData.map(d => {
+    const delta = d.varb.mfPlays - d.ctrl.mfPlays;
+    const deltaPct = ((delta / d.ctrl.mfPlays) * 100).toFixed(1);
+    const cls = delta < -1 ? 'delta-neg' : delta > 1 ? 'delta-pos' : 'delta-ns';
+    const isTrial = d.type.includes('Trial');
+    const rowBg = isTrial ? '' : ' style="background:#f8f9fb"';
+    return '<tr'+rowBg+'><td>'+d.plan+'</td><td>'+(isTrial?d.type:'<strong>'+d.type+'</strong>')+'</td><td>'+d.status+'</td>'+
+      '<td>'+d.ctrl.users+'</td><td>'+fmt(d.ctrl.mfPlays)+'</td><td>'+fmtPct(d.ctrl.compl)+'</td><td>'+fmt(d.ctrl.replay,2)+'</td>'+
+      '<td>'+d.varb.users+'</td><td>'+fmt(d.varb.mfPlays)+'</td><td>'+fmtPct(d.varb.compl)+'</td><td>'+fmt(d.varb.replay,2)+'</td>'+
+      '<td class="'+cls+'"><strong>'+(delta>0?'+':'')+deltaPct+'%</strong></td></tr>';
+  }).join('');
+}
+
+function drawTrialDirectCharts() {
+  ['Monthly','Yearly'].forEach((plan, pi) => {
+    const canvasId = pi === 0 ? 'trial-monthly-chart' : 'trial-yearly-chart';
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const pad = {t:30, b:60, l:50, r:20};
+    const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+
+    const rows = trialDirectData.filter(d => d.plan === plan);
+    // Group by type+status: 4 groups
+    const groups = rows.map(d => d.type + '\n' + d.status);
+    const maxVal = Math.max(...rows.map(d => Math.max(d.ctrl.mfPlays, d.varb.mfPlays))) * 1.2;
+    const groupW = plotW / groups.length;
+    const barW = groupW * 0.32;
+
+    rows.forEach((d, gi) => {
+      const xBase = pad.l + gi * groupW + groupW * 0.1;
+
+      // Control bar
+      const h1 = (d.ctrl.mfPlays / maxVal) * plotH;
+      ctx.fillStyle = 'rgba(37,99,235,0.8)';
+      ctx.fillRect(xBase, pad.t + plotH - h1, barW, h1);
+      ctx.fillStyle = '#333'; ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(fmt(d.ctrl.mfPlays), xBase + barW/2, pad.t + plotH - h1 - 5);
+
+      // VarB bar
+      const h2 = (d.varb.mfPlays / maxVal) * plotH;
+      ctx.fillStyle = 'rgba(245,158,11,0.8)';
+      ctx.fillRect(xBase + barW + 3, pad.t + plotH - h2, barW, h2);
+      ctx.fillText(fmt(d.varb.mfPlays), xBase + barW + 3 + barW/2, pad.t + plotH - h2 - 5);
+
+      // Delta
+      const delta = ((d.varb.mfPlays - d.ctrl.mfPlays) / d.ctrl.mfPlays * 100).toFixed(0);
+      ctx.fillStyle = parseFloat(delta) < 0 ? '#d1345b' : '#0d9668';
+      ctx.font = 'bold 10px -apple-system, sans-serif';
+      ctx.fillText((parseFloat(delta)>0?'+':'')+delta+'%', xBase + barW + 2, pad.t + 18);
+
+      // Group labels (2 lines)
+      ctx.fillStyle = '#555'; ctx.font = '10px -apple-system, sans-serif';
+      ctx.fillText(d.type, xBase + barW + 2, pad.t + plotH + 16);
+      ctx.fillStyle = d.status === 'cancelled' ? '#d1345b' : '#0d9668';
+      ctx.font = '9px -apple-system, sans-serif';
+      ctx.fillText(d.status, xBase + barW + 2, pad.t + plotH + 28);
+    });
+
+    // Y axis
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 0.5;
+    for (let v = 0; v <= maxVal; v += 5) {
+      const y = pad.t + plotH - (v / maxVal) * plotH;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      ctx.fillStyle = '#888'; ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(v.toFixed(0), pad.l - 5, y + 3);
+    }
+    ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(plan + ' — MF Plays per User', pad.l, 16);
+  });
+}
+
+function drawReplayRateChart() {
+  const canvas = document.getElementById('replay-rate-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const pad = {t:30, b:50, l:140, r:30};
+  const plotW = W - pad.l - pad.r;
+
+  // Show replay rate for trial vs direct across plans
+  const groups = [
+    {label:'Monthly Active Trial — Cancelled', ctrl:1.60, varb:1.57},
+    {label:'Monthly Active Trial — Retained', ctrl:1.86, varb:1.64},
+    {label:'Monthly Direct — Cancelled', ctrl:1.83, varb:1.62},
+    {label:'Monthly Direct — Retained', ctrl:1.80, varb:1.71},
+    {label:'Yearly Active Trial — Cancelled', ctrl:1.70, varb:1.57},
+    {label:'Yearly Active Trial — Retained', ctrl:1.78, varb:1.68},
+    {label:'Yearly Direct — Cancelled', ctrl:1.76, varb:1.70},
+    {label:'Yearly Direct — Retained', ctrl:1.82, varb:1.72}
+  ];
+  const maxVal = 2.0;
+  const barH = 8, gap = 3, groupGap = 5;
+
+  groups.forEach((g, i) => {
+    const y = pad.t + i * (barH * 2 + gap + groupGap);
+    ctx.fillStyle = '#555'; ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(g.label, pad.l - 8, y + barH + 2);
+    // Ctrl
+    const w1 = (g.ctrl / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(37,99,235,0.7)';
+    ctx.fillRect(pad.l, y, w1, barH);
+    ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.font = '9px -apple-system, sans-serif';
+    ctx.fillText(g.ctrl.toFixed(2), pad.l + w1 + 4, y + barH - 1);
+    // VarB
+    const w2 = (g.varb / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(245,158,11,0.7)';
+    ctx.fillRect(pad.l, y + barH + gap, w2, barH);
+    ctx.fillText(g.varb.toFixed(2), pad.l + w2 + 4, y + barH + gap + barH - 1);
+  });
+  ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('Replay Rate by Segment — VarB consistently lower', pad.l, 16);
+}
+
+// ============================================================
+// SECTION 13: REPLAY ANALYSIS RENDERING
+// ============================================================
+function drawReplayCharts() {
+  ['ctrl','varb'].forEach(grp => {
+    const canvasId = 'replay-'+grp+'-chart';
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const pad = {t:30, b:20, l:120, r:80};
+    const data = replayData[grp];
+    const plotW = W - pad.l - pad.r;
+    const barH = 22, gap = 8;
+    const maxUsers = Math.max(...data.map(d => d.users)) * 1.1;
+
+    data.forEach((d, i) => {
+      const y = pad.t + i * (barH + gap);
+      // Label
+      ctx.fillStyle = '#333'; ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(cleanName(d.act), pad.l - 8, y + barH/2 + 4);
+      // Bar (width = users)
+      const w = (d.users / maxUsers) * plotW;
+      const color = d.act === 'bathroom_game' ? '#2563eb' :
+                    d.act === 'meta_rewards_stickers' ? '#8b5cf6' : '#64748b';
+      ctx.fillStyle = color + 'cc';
+      ctx.fillRect(pad.l, y, w, barH);
+      // Users count
+      ctx.fillStyle = '#333'; ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(fmtN(d.users) + ' users', pad.l + w + 6, y + barH/2 + 1);
+      // Replay rate badge inside bar
+      if (w > 60) {
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px -apple-system, sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(d.avgReplays.toFixed(1) + 'x', pad.l + w - 6, y + barH/2 + 4);
+      }
+    });
+    const label = grp === 'ctrl' ? 'Control' : 'Variant B';
+    ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(label + ' — Users whose top activity is:', pad.l, 18);
+  });
+}
+
+function renderReplayCompareTable() {
+  const tb = document.getElementById('replay-compare-table');
+  if (!tb) return;
+  // Merge ctrl and varb by activity
+  const allActs = [...new Set([...replayData.ctrl.map(d=>d.act), ...replayData.varb.map(d=>d.act)])];
+  const rows = allActs.map(act => {
+    const c = replayData.ctrl.find(d=>d.act===act) || {users:0, avgReplays:0};
+    const v = replayData.varb.find(d=>d.act===act) || {users:0, avgReplays:0};
+    return {act, cUsers:c.users, cReplays:c.avgReplays, vUsers:v.users, vReplays:v.avgReplays};
+  }).sort((a,b) => b.cUsers - a.cUsers);
+
+  tb.innerHTML = rows.map(d => {
+    const uDelta = d.vUsers - d.cUsers;
+    const rDelta = d.vReplays - d.cReplays;
+    const uCls = uDelta < 0 ? 'delta-neg' : uDelta > 0 ? 'delta-pos' : '';
+    const rCls = rDelta < 0 ? 'delta-neg' : rDelta > 0 ? 'delta-pos' : '';
+    return '<tr><td class="act-name">'+cleanName(d.act)+'</td><td>'+fmtN(d.cUsers)+'</td><td>'+fmt(d.cReplays,1)+'x</td>'+
+      '<td>'+fmtN(d.vUsers)+'</td><td>'+fmt(d.vReplays,1)+'x</td>'+
+      '<td class="'+uCls+'">'+(uDelta>0?'+':'')+uDelta+'</td>'+
+      '<td class="'+rCls+'">'+(rDelta>0?'+':'')+fmt(rDelta,1)+'</td></tr>';
+  }).join('');
+}
+
+function drawCancelSourceChart() {
+  const canvas = document.getElementById('cancel-source-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const pad = {t:30, b:60, l:140, r:50};
+  const data = cancelSourceData;
+  const barH = 12, gap = 5, groupGap = 10;
+  const plotW = W - pad.l - pad.r;
+  const maxVal = 75000; // absolute plays
+
+  data.forEach((d, i) => {
+    const y = pad.t + i * (barH * 2 + gap + groupGap);
+    ctx.fillStyle = '#555'; ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(cleanName(d.source), pad.l - 8, y + barH);
+    // Ctrl
+    const w1 = (d.ctrl / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(37,99,235,0.8)';
+    ctx.fillRect(pad.l, y, w1, barH);
+    ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText((d.ctrl/1000).toFixed(1) + 'K', pad.l + w1 + 4, y + barH - 1);
+    // VarB
+    const w2 = (d.varb / maxVal) * plotW;
+    ctx.fillStyle = 'rgba(245,158,11,0.8)';
+    ctx.fillRect(pad.l, y + barH + gap, w2, barH);
+    ctx.fillStyle = '#333';
+    ctx.fillText((d.varb/1000).toFixed(1) + 'K', pad.l + w2 + 4, y + barH + gap + barH - 1);
+  });
+  ctx.fillStyle = '#333'; ctx.font = 'bold 12px -apple-system, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('Source Distribution — Cancelled Monthly (absolute plays)', pad.l, 16);
+  // Note about denominator
+  ctx.fillStyle = '#888'; ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText('Ctrl total: 475K plays | VarB total: 107K plays (78% fewer)', pad.l, H - 8);
+}
+
+// ============================================================
+// SIDEBAR NAV HIGHLIGHTING
+// ============================================================
+function setupNav() {
+  const links = document.querySelectorAll('.sidebar a');
+  const sections = [];
+  links.forEach(a => {
+    const href = a.getAttribute('href');
+    if (href && href.startsWith('#')) {
+      const el = document.getElementById(href.slice(1));
+      if (el) sections.push({link: a, el});
+    }
+  });
+
+  function updateActive() {
+    const scrollY = window.scrollY + 100;
+    let current = sections[0];
+    sections.forEach(s => {
+      if (s.el.offsetTop <= scrollY) current = s;
+    });
+    links.forEach(l => l.classList.remove('active'));
+    if (current) current.link.classList.add('active');
+  }
+
+  window.addEventListener('scroll', updateActive);
+  updateActive();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  renderRiskMatrix();
+  drawDrillDown();
+  renderGrowthBook();
+  drawW0RetPlanChart();
+  renderPlanTable();
+  drawPlanDeltaChart();
+  renderCancelBreakdown();
+  renderSegDeltaTable();
+  drawCrossD1Charts();
+  renderCrossTables();
+  renderPivots();
+  drawPTRPosChart();
+  drawBathroomPTRChart();
+  renderTop20();
+  drawJaccardChart();
+  renderLastPlay();
+  drawAnna();
+  drawSourceChart();
+  // Section 9: Session Start
+  drawSessionSourceChart();
+  drawFirstMfGameChart();
+  // Section 10: Sticker vs Bathroom
+  renderStickerTable();
+  drawStickerDurChart();
+  drawStickerMetricsChart();
+  // Section 11: Renewed vs Cancelled
+  renderCancelPatternTable();
+  drawCancelCharts();
+  renderCancelTopGames();
+  drawCancelSourceChart();
+  // Section 12: Trial/Direct
+  renderTrialDirectTable();
+  drawTrialDirectCharts();
+  drawReplayRateChart();
+  // Section 13: Replay Analysis
+  drawReplayCharts();
+  renderReplayCompareTable();
+  setupNav();
+}
+
+window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('resize', () => {
+  drawDrillDown();
+  drawW0RetPlanChart();
+  drawPTRPosChart();
+  drawBathroomPTRChart();
+  drawCrossD1Charts();
+  drawJaccardChart();
+  drawAnna();
+  drawSourceChart();
+  drawPlanDeltaChart();
+  renderLastPlay();
+  drawSessionSourceChart();
+  drawFirstMfGameChart();
+  drawStickerDurChart();
+  drawStickerMetricsChart();
+  drawCancelCharts();
+  drawCancelSourceChart();
+  drawTrialDirectCharts();
+  drawReplayRateChart();
+  drawReplayCharts();
+});
+</script>
+
+</body>
+</html>
