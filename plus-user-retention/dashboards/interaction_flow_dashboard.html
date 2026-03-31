@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>User App Interaction Flow — Day 0</title>
+<style>
+  :root {
+    --bg: #f8f9fa; --card: #fff; --text: #1a1a2e; --muted: #6c757d;
+    --blue: #3b82f6; --red: #ef4444; --green: #22c55e; --amber: #f59e0b;
+    --purple: #8b5cf6; --teal: #14b8a6; --pink: #ec4899;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  .header { background: linear-gradient(135deg, #1e3a5f, #2d5a87); color: #fff; padding: 2rem; text-align: center; }
+  .header h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+  .header p { opacity: 0.8; font-size: 0.95rem; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .card-full { grid-column: 1 / -1; }
+  .card h2 { font-size: 1.15rem; margin-bottom: 1rem; color: var(--text); border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; }
+  .card h3 { font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--muted); }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat { background: var(--card); border-radius: 10px; padding: 1.2rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .stat .num { font-size: 2rem; font-weight: 700; }
+  .stat .label { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
+  .stat .sub { font-size: 0.75rem; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th { background: #f1f5f9; padding: 0.6rem 0.8rem; text-align: left; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: var(--muted); }
+  td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #e5e7eb; }
+  tr:hover { background: #f8fafc; }
+  .bar-cell { position: relative; }
+  .bar-fill { position: absolute; top: 0; left: 0; height: 100%; opacity: 0.12; border-radius: 2px; }
+  .highlight { font-weight: 700; }
+  .tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+  .tag-red { background: #fef2f2; color: var(--red); }
+  .tag-green { background: #f0fdf4; color: var(--green); }
+  .tag-amber { background: #fffbeb; color: var(--amber); }
+  .tag-blue { background: #eff6ff; color: var(--blue); }
+  .insight { background: #fffbeb; border-left: 4px solid var(--amber); padding: 0.8rem 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0; font-size: 0.9rem; }
+  .insight-red { background: #fef2f2; border-left-color: var(--red); }
+  .callout { font-weight: 600; }
+  .flow-chart { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
+  .flow-node { background: #eff6ff; border: 2px solid var(--blue); border-radius: 8px; padding: 0.5rem 1rem; text-align: center; min-width: 100px; }
+  .flow-node .flow-num { font-size: 1.3rem; font-weight: 700; color: var(--blue); }
+  .flow-node .flow-label { font-size: 0.7rem; color: var(--muted); }
+  .flow-arrow { font-size: 1.5rem; color: var(--muted); }
+  .flow-node.ghost { border-color: var(--red); background: #fef2f2; }
+  .flow-node.ghost .flow-num { color: var(--red); }
+  .source-bar { height: 24px; border-radius: 4px; display: flex; overflow: hidden; margin: 0.3rem 0; }
+  .source-bar div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 600; color: #fff; min-width: 30px; }
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0.5rem 0; font-size: 0.8rem; }
+  .legend-item { display: flex; align-items: center; gap: 0.3rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+  .section-title { font-size: 1.3rem; font-weight: 700; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 3px solid var(--blue); }
+  .note { font-size: 0.78rem; color: var(--muted); margin-top: 0.8rem; }
+  .pct-bar { background: #e5e7eb; border-radius: 4px; height: 20px; position: relative; overflow: hidden; }
+  .pct-bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 6px; font-size: 0.7rem; font-weight: 600; color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>User App Interaction Flow &mdash; Day 0 Analysis</h1>
+  <p>Jan&ndash;Feb 2026 Plus cohort &middot; 104,704 users &middot; Production data</p>
+</div>
+
+<div class="container">
+
+<!-- Top-line stats -->
+<div class="stat-grid">
+  <div class="stat">
+    <div class="num" style="color:var(--blue)">104.7K</div>
+    <div class="label">Plus Users (Jan-Feb 2026)</div>
+    <div class="sub">From customer_first_paid_subscription</div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:var(--red)">76%</div>
+    <div class="label">Non-Players (0 games Day 0)</div>
+    <div class="sub">79,601 users play zero games</div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:var(--green)">88.5%</div>
+    <div class="label">Return Rate (11+ games)</div>
+    <div class="sub">vs 9.7% for non-players</div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:var(--purple)">93.2K</div>
+    <div class="label">Had Sessions Day 0</div>
+    <div class="sub">~11K never even open the app</div>
+  </div>
+</div>
+
+<div class="insight insight-red">
+  <span class="callout">Critical:</span> 3 out of 4 Plus users play zero games on day 0 &mdash; but 68.5% of them spend 10+ min in the app. They browse, they navigate, they just don't play. Trial users are worse (82-83%) than direct (65-67%). This is a <strong>conversion-to-play</strong> barrier, not a "didn't open the app" problem.
+  <br><br><em>Note: "Non-player" = 0 game exit events on day 0. Not the same as "ghost" from the retention analysis (ghost = no interaction + still paying + sustained).</em>
+</div>
+
+<!-- Section 1: Engagement Funnel -->
+<div class="section-title">1. Day 0 Engagement &rarr; W0 Return</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Games Played on Day 0 vs Return Rate</h2>
+    <table>
+      <thead>
+        <tr><th>Day 0 Games</th><th>Users</th><th>% of Total</th><th>W0 Return</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#fef2f2;">
+          <td><span class="highlight">0 (Non-player)</span></td>
+          <td>79,601</td>
+          <td>76.0%</td>
+          <td><span class="tag tag-red">9.7%</span></td>
+        </tr>
+        <tr>
+          <td>1&ndash;2</td>
+          <td>1,123</td>
+          <td>1.1%</td>
+          <td><span class="tag tag-amber">55.3%</span></td>
+        </tr>
+        <tr>
+          <td>3&ndash;5</td>
+          <td>1,500</td>
+          <td>1.4%</td>
+          <td><span class="tag tag-amber">61.1%</span></td>
+        </tr>
+        <tr>
+          <td>6&ndash;10</td>
+          <td>2,804</td>
+          <td>2.7%</td>
+          <td><span class="tag tag-green">70.4%</span></td>
+        </tr>
+        <tr style="background:#f0fdf4;">
+          <td><span class="highlight">11+</span></td>
+          <td>19,676</td>
+          <td>18.8%</td>
+          <td><span class="tag tag-green">88.5%</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="insight">
+      <span class="callout">Bimodal:</span> Users either don't play at all (76%) or play 11+ games (19%). Almost no one lands in 1-10 range (5.2%). This isn't a gradual funnel &mdash; it's a cliff.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Trial vs Direct: Non-Player Rates</h2>
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Plan</th><th>Users</th><th>Non-Player %</th><th>Avg Games</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Direct</td>
+          <td>Monthly</td>
+          <td>28,317</td>
+          <td><span class="tag tag-amber">64.7%</span></td>
+          <td>14.1</td>
+        </tr>
+        <tr>
+          <td>Direct</td>
+          <td>Yearly</td>
+          <td>11,212</td>
+          <td><span class="tag tag-amber">67.3%</span></td>
+          <td>12.4</td>
+        </tr>
+        <tr style="background:#fef2f2;">
+          <td>Trial</td>
+          <td>Monthly</td>
+          <td>29,665</td>
+          <td><span class="tag tag-red">82.9%</span></td>
+          <td>5.3</td>
+        </tr>
+        <tr style="background:#fef2f2;">
+          <td>Trial</td>
+          <td>Yearly</td>
+          <td>35,478</td>
+          <td><span class="tag tag-red">82.1%</span></td>
+          <td>6.2</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="insight insight-red">
+      <span class="callout">Trial non-players:</span> 82% of trial users never play a single game on their first day. Median = 0 for all segments. Many trial starts may be accidental (forced paywall onboarding).
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: Session Structure -->
+<div class="section-title">2. Session Structure on Day 0</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Sessions Per User on Day 0</h2>
+    <p class="note" style="margin-bottom:0.8rem">Only users who opened the app (93.2K of 104.7K)</p>
+    <table>
+      <thead>
+        <tr><th>Sessions</th><th>Users</th><th>%</th><th>Avg Time</th><th>With Game</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1 session</td>
+          <td>28,792</td>
+          <td>30.9%</td>
+          <td>34 min</td>
+          <td>0.9</td>
+        </tr>
+        <tr>
+          <td>2 sessions</td>
+          <td>21,497</td>
+          <td>23.1%</td>
+          <td>60 min</td>
+          <td>1.6</td>
+        </tr>
+        <tr>
+          <td>3&ndash;4 sessions</td>
+          <td>23,586</td>
+          <td>25.3%</td>
+          <td>94 min</td>
+          <td>2.7</td>
+        </tr>
+        <tr>
+          <td>5+ sessions</td>
+          <td>19,292</td>
+          <td>20.7%</td>
+          <td>157 min</td>
+          <td>7.2</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="insight">
+      <span class="callout">Key:</span> Even users with 1 session spend 34 min in the app but average &lt;1 game session. They're in the app, browsing, but not playing. This signals a <strong>navigation/discovery barrier</strong>, not a "didn't open app" problem.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What Do Non-Players Do on Day 0?</h2>
+    <p class="note" style="margin-bottom:0.8rem">Jan 2026 cohort: 51,701 users with 0 game plays on day 0. Only 0.4% play later in W0.</p>
+    <table>
+      <thead>
+        <tr><th>Day 0 Behavior</th><th>Users</th><th>%</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eff6ff;">
+          <td><span class="highlight">10+ min in app, 0 games</span></td>
+          <td>35,433</td>
+          <td>68.5%</td>
+        </tr>
+        <tr>
+          <td>2&ndash;10 min in app, 0 games</td>
+          <td>3,468</td>
+          <td>6.7%</td>
+        </tr>
+        <tr>
+          <td>&lt;2 min in app, 0 games</td>
+          <td>1,041</td>
+          <td>2.0%</td>
+        </tr>
+        <tr style="background:#fef2f2;">
+          <td><span class="highlight">No app session at all</span></td>
+          <td>11,759</td>
+          <td>22.7%</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="insight">
+      <span class="callout">Key finding:</span> 68.5% of non-players spend <strong>10+ minutes</strong> browsing the app without playing a single game. They're not absent &mdash; they're stuck. Only 23% truly never opened the app. This is a <strong>navigation/conversion-to-play</strong> barrier.
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: Source Flow -->
+<div class="section-title">3. Where Users Start &amp; How Source Mix Evolves</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <h2>Source Group by Game Position (1st&ndash;5th game played)</h2>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> Multifeed</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> IP World</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Recommended</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div> Lessons</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--pink)"></div> Family Time</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div> Videos</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#94a3b8"></div> Other</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Game #</th><th>Users</th><th>Multifeed</th><th>IP World</th><th>Recommended</th><th>Lessons</th><th>Other</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="highlight">1st</span></td>
+        <td>25,103</td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:71.2%;background:var(--blue)">71%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:19.6%;background:var(--purple)">20%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:0.5%;background:var(--green)">1%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:3.5%;background:var(--teal)"></div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:5.2%;background:#94a3b8"></div></div>
+        </td>
+      </tr>
+      <tr>
+        <td><span class="highlight">2nd</span></td>
+        <td>24,500</td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:48.2%;background:var(--blue)">48%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:21.4%;background:var(--purple)">21%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:20.6%;background:var(--green)">21%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:4.2%;background:var(--teal)">4%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:5.6%;background:#94a3b8"></div></div>
+        </td>
+      </tr>
+      <tr>
+        <td><span class="highlight">3rd</span></td>
+        <td>23,980</td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:44.4%;background:var(--blue)">44%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:22.5%;background:var(--purple)">23%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:22.5%;background:var(--green)">23%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:4.6%;background:var(--teal)">5%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:6.0%;background:#94a3b8"></div></div>
+        </td>
+      </tr>
+      <tr>
+        <td><span class="highlight">4th</span></td>
+        <td>23,485</td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:41.5%;background:var(--blue)">42%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:23.4%;background:var(--purple)">23%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:23.8%;background:var(--green)">24%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:4.8%;background:var(--teal)">5%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:6.5%;background:#94a3b8"></div></div>
+        </td>
+      </tr>
+      <tr>
+        <td><span class="highlight">5th</span></td>
+        <td>22,966</td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:39.4%;background:var(--blue)">39%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:23.8%;background:var(--purple)">24%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:24.9%;background:var(--green)">25%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:5.0%;background:var(--teal)">5%</div></div>
+        </td>
+        <td>
+          <div class="pct-bar"><div class="pct-bar-fill" style="width:6.9%;background:#94a3b8"></div></div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="insight">
+    <span class="callout">Pattern:</span> Multifeed dominates the 1st game (71%) but drops to 39% by game 5. Recommended surges from 1% &rarr; 25% (autoplay/suggestion loop). IP Worlds steady at 20-24%. Lessons hold at ~5% but their completion rate <strong>increases</strong> from 59% &rarr; 72% &mdash; users who reach later games engage deeper with lessons.
+  </div>
+</div>
+
+<!-- Section 4: Completion by position -->
+<div class="section-title">4. Play Sequence Funnel</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>User Drop-off Across Game Positions</h2>
+    <table>
+      <thead>
+        <tr><th>Game #</th><th>Users</th><th>Drop %</th><th>Completion</th><th>Avg Duration</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>25,103</td><td>&mdash;</td><td>63.9%</td><td>100s</td></tr>
+        <tr><td>2</td><td>24,500</td><td>-2.4%</td><td>63.0%</td><td>96s</td></tr>
+        <tr><td>3</td><td>23,980</td><td>-2.1%</td><td>62.7%</td><td>99s</td></tr>
+        <tr><td>5</td><td>22,966</td><td>-4.3%</td><td>64.8%</td><td>95s</td></tr>
+        <tr><td>8</td><td>21,418</td><td>-6.7%</td><td>63.9%</td><td>99s</td></tr>
+        <tr><td>10</td><td>20,318</td><td>-5.1%</td><td>63.1%</td><td>98s</td></tr>
+        <tr><td>15</td><td>17,293</td><td>-14.9%</td><td>61.9%</td><td>97s</td></tr>
+      </tbody>
+    </table>
+    <div class="insight">
+      <span class="callout">Stable funnel:</span> Once a user starts playing, completion rate stays flat (~62-65%) and duration stays ~97s. The 25K&rarr;17K drop over 15 games is gradual (31% attrition). The real cliff is the <strong>0&rarr;1 game</strong> transition (76% never get there).
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Source-Level Completion Rates</h2>
+    <table>
+      <thead>
+        <tr><th>Source</th><th>Plays</th><th>Users</th><th>Completion</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Multifeed</td><td>192K</td><td>22.8K</td><td>60.0%</td></tr>
+        <tr><td>Recommended #1</td><td>130K</td><td>15.5K</td><td><span class="highlight" style="color:var(--green)">65.0%</span></td></tr>
+        <tr><td>Recommended #2</td><td>90K</td><td>14.0K</td><td>61.0%</td></tr>
+        <tr><td>Past Activity</td><td>71K</td><td>12.4K</td><td>56.6%</td></tr>
+        <tr><td>Spiderman</td><td>52K</td><td>7.7K</td><td>59.4%</td></tr>
+        <tr><td>Blippi</td><td>24K</td><td>3.9K</td><td><span class="highlight" style="color:var(--green)">65.4%</span></td></tr>
+        <tr><td>Family Time</td><td>21K</td><td>3.7K</td><td>55.2%</td></tr>
+        <tr><td>Videos</td><td>6.4K</td><td>3.4K</td><td><span class="highlight" style="color:var(--red)">29.6%</span></td></tr>
+        <tr><td>Feed Set Topic</td><td>5.6K</td><td>3.5K</td><td><span class="highlight" style="color:var(--red)">0.1%</span></td></tr>
+      </tbody>
+    </table>
+    <div class="insight insight-red">
+      <span class="callout">Red flag:</span> <code>feed_set_topic</code> has 3.5K users but 0.1% completion &mdash; effectively broken. Videos at 29.6% completion. Blippi (65.4%) and Recommended #1 (65%) are the highest-completing sources.
+    </div>
+  </div>
+</div>
+
+<!-- Section 5: Drop-off patterns -->
+<div class="section-title">5. Where Users Who Never Return Drop Off</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <h2>Last Activity Before Leaving (users who played on Day 0 but never returned in W0)</h2>
+  <p class="note" style="margin-bottom:0.8rem;">~4,200 users played games on day 0 but did not return within the first week</p>
+  <table>
+    <thead>
+      <tr><th>Last Source</th><th>Completed?</th><th>Users</th><th>%</th><th>Avg Duration</th></tr>
+    </thead>
+    <tbody>
+      <tr style="background:#fef2f2;">
+        <td>Multifeed</td><td><span class="tag tag-red">Abandoned</span></td><td>474</td><td>11.4%</td><td>52s</td>
+      </tr>
+      <tr>
+        <td>Multifeed</td><td><span class="tag tag-green">Completed</span></td><td>373</td><td>8.9%</td><td>135s</td>
+      </tr>
+      <tr>
+        <td>Recommended #1</td><td><span class="tag tag-green">Completed</span></td><td>338</td><td>8.1%</td><td>170s</td>
+      </tr>
+      <tr style="background:#fef2f2;">
+        <td>Recommended #1</td><td><span class="tag tag-red">Abandoned</span></td><td>244</td><td>5.9%</td><td>64s</td>
+      </tr>
+      <tr>
+        <td>Recommended #2</td><td><span class="tag tag-green">Completed</span></td><td>242</td><td>5.8%</td><td>181s</td>
+      </tr>
+      <tr style="background:#fef2f2;">
+        <td>Recommended #2</td><td><span class="tag tag-red">Abandoned</span></td><td>190</td><td>4.6%</td><td>80s</td>
+      </tr>
+      <tr>
+        <td>Spiderman</td><td><span class="tag tag-green">Completed</span></td><td>172</td><td>4.1%</td><td>208s</td>
+      </tr>
+      <tr>
+        <td>Past Activity</td><td><span class="tag tag-green">Completed</span></td><td>122</td><td>2.9%</td><td>131s</td>
+      </tr>
+      <tr style="background:#fef2f2;">
+        <td>Past Activity</td><td><span class="tag tag-red">Abandoned</span></td><td>111</td><td>2.7%</td><td>112s</td>
+      </tr>
+      <tr style="background:#fef2f2;">
+        <td>Spiderman</td><td><span class="tag tag-red">Abandoned</span></td><td>96</td><td>2.3%</td><td>68s</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid-2" style="margin-top: 1rem;">
+    <div class="insight">
+      <span class="callout">Abandoned exits:</span> Users who abandon their last game spend 52-80s avg &mdash; roughly half the duration of completers (131-208s). Short sessions suggest frustration or disinterest, not a natural stopping point.
+    </div>
+    <div class="insight">
+      <span class="callout">Completed exits:</span> 42% of users who leave actually <em>completed</em> their last game. They didn't fail &mdash; they just weren't pulled back. This is a <strong>re-engagement / hook problem</strong>, not a difficulty problem.
+    </div>
+  </div>
+</div>
+
+<!-- Section 6: IP World breakdown -->
+<div class="section-title">6. Character IP Engagement on Day 0</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <h2>IP World Sources &mdash; Day 0 Plays</h2>
+  <table>
+    <thead>
+      <tr><th>IP World</th><th>Plays</th><th>Users</th><th>Plays/User</th><th>Completion</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Spiderman</td><td>51,586</td><td>7,685</td><td>6.7</td><td>59.4%</td>
+      </tr>
+      <tr>
+        <td>Zootopia</td><td>23,053</td><td>6,504</td><td>3.5</td><td>61.4%</td>
+      </tr>
+      <tr>
+        <td>Frozen</td><td>22,110</td><td>5,589</td><td>4.0</td><td>52.2%</td>
+      </tr>
+      <tr>
+        <td>Mickey &amp; Friends</td><td>18,717</td><td>4,764</td><td>3.9</td><td>56.5%</td>
+      </tr>
+      <tr>
+        <td>Moana</td><td>13,635</td><td>4,460</td><td>3.1</td><td>55.7%</td>
+      </tr>
+      <tr>
+        <td>Blippi</td><td>24,216</td><td>3,885</td><td>6.2</td><td><span class="highlight" style="color:var(--green)">65.4%</span></td>
+      </tr>
+      <tr>
+        <td>Elliot</td><td>19,998</td><td>3,261</td><td>6.1</td><td>60.3%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="insight">
+    <span class="callout">Stickiest IPs:</span> Spiderman (6.7 plays/user), Blippi (6.2), Elliot (6.1) have the highest replay rates. Blippi also has the highest completion (65.4%). Frozen has the lowest completion (52.2%) &mdash; worth investigating game difficulty. These patterns are key for Q7 (post-conversion IP stickiness).
+  </div>
+</div>
+
+<!-- Key takeaways -->
+<div class="section-title">Key Takeaways</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <h2>What This Tells Us</h2>
+
+  <table>
+    <thead>
+      <tr><th style="width:30%">Finding</th><th>Implication</th><th style="width:25%">Next Step</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>76% non-player rate</strong>, 68.5% spend 10+ min browsing</td>
+        <td>Users navigate but don't start games. Conversion-to-play barrier, not awareness.</td>
+        <td>Screen-level analysis: what screens do non-players visit? Where do they get stuck?</td>
+      </tr>
+      <tr>
+        <td><strong>Trial non-players 82%</strong> vs Direct 65%</td>
+        <td>Trial users convert through paywall but many never intended to use the app. "Accidental trials."</td>
+        <td>Segment trial non-players: &lt;2 min + 0 games = likely forced paywall conversion</td>
+      </tr>
+      <tr>
+        <td><strong>Bimodal engagement</strong>: 0 or 11+ games</td>
+        <td>No gradual ramp-up. Users who start playing get hooked; the problem is starting.</td>
+        <td>Focus on the 0&rarr;1 transition, not improving existing player experience</td>
+      </tr>
+      <tr>
+        <td><strong>Multifeed = 71% of 1st games</strong></td>
+        <td>The main feed is the primary entry point. Its content and ordering matter most for activation.</td>
+        <td>Analyze multifeed position: does feed order affect first-game choice?</td>
+      </tr>
+      <tr>
+        <td><strong>feed_set_topic: 0.1% completion</strong></td>
+        <td>Effectively broken source. 3.5K users enter but almost none complete a game.</td>
+        <td>Bug or UX issue? Needs investigation with product team.</td>
+      </tr>
+      <tr>
+        <td><strong>42% of churned leave after completing</strong></td>
+        <td>They didn't fail. They just didn't come back. Missing re-engagement hook.</td>
+        <td>Post-game experience: what do users see after completing? Is there a "next" prompt?</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="note" style="text-align:center; padding: 1rem;">
+  Source: <code>production.lingokids_core.customer_first_paid_subscription</code> &middot;
+  <code>production.lingokids_content.activity_exit_events_with_sessions_stage</code> &middot;
+  <code>production.lingokids_core.sessions</code><br>
+  Cohort: Jan&ndash;Feb 2026 first-payment users &middot; Day 0 = trial start (trial) or payment date (direct)<br>
+  Generated 2026-03-11
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plus User Journey — Sankey</title>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/highcharts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/modules/sankey.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/modules/exporting.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root { --blue:#3b82f6; --green:#16a34a; --orange:#f59e0b; --red:#ef4444; --purple:#7c3aed;
+  --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+.header { background:linear-gradient(135deg,#3b82f6 0%,#7c3aed 100%); padding:18px 24px; color:#fff; }
+.header h1 { font-size:18px; font-weight:700; }
+.header .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:2px; }
+#filter-summary { font-size:11px; color:rgba(255,255,255,.9); margin-top:4px; font-weight:500; }
+.controls { background:var(--card); border-bottom:1px solid var(--border); padding:10px 24px; display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+.ctrl { display:flex; flex-direction:column; gap:1px; }
+.ctrl label { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.ctrl select { font-size:12px; padding:3px 6px; border:1px solid var(--border); border-radius:4px; background:#fff; min-width:100px; }
+.ms { position:relative; }
+.ms-btn { font-size:12px; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:#fff; cursor:pointer; display:flex; align-items:center; gap:4px; min-width:80px; white-space:nowrap; }
+.ms-btn:hover { border-color:var(--blue); }
+.ms-btn .badge { background:var(--blue); color:#fff; font-size:9px; border-radius:8px; padding:0 5px; font-weight:700; }
+.ms-drop { position:absolute; top:100%; left:0; z-index:999; background:#fff; border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.12); margin-top:2px; min-width:160px; max-height:260px; overflow-y:auto; display:none; }
+.ms-drop.open { display:block; }
+.ms-drop label { display:flex; align-items:center; gap:6px; padding:4px 10px; font-size:11px; cursor:pointer; }
+.ms-drop label:hover { background:#f1f5f9; }
+.ms-drop .ms-all { border-bottom:1px solid var(--border); font-weight:600; }
+.sep { width:1px; background:var(--border); align-self:stretch; margin:0 4px; }
+#file-upload { padding:40px; text-align:center; }
+.drop-zone { border:2px dashed var(--border); border-radius:12px; padding:40px; cursor:pointer; }
+.drop-zone:hover { border-color:var(--blue); }
+.hidden { display:none; }
+.toggles { background:var(--card); border-bottom:1px solid var(--border); padding:8px 24px; display:flex; gap:16px; align-items:center; }
+.toggles .tl { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.tog { display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; user-select:none; }
+.tog input { accent-color:var(--blue); }
+.tog .arrows { display:inline-flex; gap:1px; margin-left:2px; }
+.tog .arr { background:none; border:1px solid var(--border); border-radius:3px; cursor:pointer; font-size:9px; line-height:1; padding:1px 3px; color:var(--muted); }
+.tog .arr:hover { background:var(--blue); color:#fff; border-color:var(--blue); }
+.chart-wrap { padding:14px 24px; }
+.chart-card { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+#sankey-container { min-height:500px; }
+.stats-row { display:flex; gap:12px; padding:14px 24px; flex-wrap:wrap; }
+.stat { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 14px; flex:1; min-width:120px; }
+.stat .l { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.stat .v { font-size:22px; font-weight:700; margin-top:2px; }
+.stat .d { font-size:11px; color:var(--muted); margin-top:1px; }
+.note { font-size:11px; color:var(--muted); padding:0 24px 14px; }
+.ctrl.compare { border:2px solid var(--blue); border-radius:6px; padding:4px 8px; background:#eff6ff; }
+.ctrl.compare label { color:var(--blue); }
+.compare-grid { display:flex; gap:16px; overflow-x:auto; }
+.compare-panel { flex:1; min-width:500px; }
+.compare-panel .chart-card { height:100%; }
+.compare-panel h4 { font-size:12px; font-weight:700; text-align:center; padding:8px 12px; margin:0; border-bottom:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Plus User Journey — Sankey</h1>
+  <div class="sub">Plan &rarr; Was Basic? &rarr; Trial path &rarr; Trial engagement &rarr; W0 Activation &rarr; D31-60 Retention</div>
+  <div id="filter-summary"></div>
+</div>
+
+<div id="file-upload">
+  <div class="drop-zone" id="drop-zone">
+    <p style="font-size:28px">&#128194;</p>
+    <p style="font-weight:600;font-size:15px;margin:8px 0">Load journey data</p>
+    <p style="color:var(--muted);font-size:12px">
+      <code>SELECT * FROM sandbox.lingokids_tammyliang_content.plus_user_retention WHERE journey_day = 0</code><br>
+      Drop CSV or click to upload
+    </p>
+    <input type="file" id="csv-input" accept=".csv" style="display:none">
+  </div>
+</div>
+
+<div id="dashboard" class="hidden">
+  <div class="controls" id="controls-bar"></div>
+  <div class="stats-row" id="stats-bar"></div>
+  <div class="toggles" id="stage-bar"></div>
+  <div class="chart-wrap">
+    <div class="chart-card">
+      <div id="sankey-container"></div>
+    </div>
+  </div>
+  <div class="note">Flow width = user volume. <b>Click any node</b> to highlight its full upstream + downstream path (click again to reset). Each node label shows count, D31-60 retention %, and 30-day cancellation %. Hover for detailed tooltip. Only users with retention window included.</div>
+</div>
+
+<script>
+// ================================================================
+// GLOBALS
+// ================================================================
+let RAW = [], FILTERED = [];
+
+// All available stages — order + enabled state is dynamic
+const STAGE_DEFS = [
+  { id: 'basic', label: 'Was Basic' },
+  { id: 'plan',  label: 'Plan' },
+  { id: 'trial', label: 'Trial/Direct' },
+  { id: 'eng',   label: 'Trial Engagement' },
+  { id: 'w0',    label: 'W0 Activation' },
+  { id: 'canc',  label: 'Cancelled 30d' },
+  { id: 'ret',   label: 'Retained/Churned' },
+];
+// Current order + enabled (mutable)
+let stageOrder = STAGE_DEFS.map(s => ({ ...s, enabled: true }));
+
+const STAGE_COLORS = {
+  plan: '#3b82f6',
+  basic: '#6366f1',
+  trial: '#9333ea',
+  eng: '#a855f7',
+  direct: '#22c55e',
+  w0act: '#16a34a',
+  w0ina: '#94a3b8',
+  ret: '#16a34a',
+  chu: '#ef4444',
+  canc: '#f59e0b',
+};
+
+const FILTERS = [
+  {col:'subscription_period',label:'Plan'},
+  {col:'if_trial',label:'Trial'},
+  {col:'platform',label:'Platform'},
+  {col:'country_group',label:'Country'},
+  {col:'rfmc_segment',label:'RFMC'},
+  {col:'conversion_trigger',label:'Trigger'},
+  {col:'is_reinstall',label:'Reinstall'},
+  {col:'was_basic_user',label:'Was Basic'},
+  {col:'trial_engagement_level',label:'Trial Eng'},
+  {col:'tenure_bucket',label:'Tenure'},
+  {col:'cancel_timing_bucket',label:'Cancel'},
+];
+const COMPARE_OPTIONS = [
+  {col:'__none__',label:'None'},
+  {col:'subscription_period',label:'Plan'},
+  {col:'if_trial',label:'Trial'},
+  {col:'platform',label:'Platform'},
+  {col:'country_group',label:'Country'},
+  {col:'rfmc_segment',label:'RFMC'},
+  {col:'conversion_trigger',label:'Trigger'},
+  {col:'trial_engagement_level',label:'Trial Eng'},
+  {col:'tenure_bucket',label:'Tenure'},
+  {col:'was_basic_user',label:'Was Basic'},
+  {col:'cancelled_30d',label:'Cancelled 30d'},
+  {col:'is_retained_next_30d',label:'Retained/Churned'},
+];
+const PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+
+// ================================================================
+// FILE UPLOAD
+// ================================================================
+const dz = document.getElementById('drop-zone');
+const fi = document.getElementById('csv-input');
+dz.onclick = () => fi.click();
+dz.ondragover = e => { e.preventDefault(); dz.style.borderColor='#3b82f6'; };
+dz.ondragleave = () => { dz.style.borderColor='#e2e8f0'; };
+dz.ondrop = e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); };
+fi.onchange = e => loadFile(e.target.files[0]);
+
+fetch('journey_data.csv').then(r => {
+  if (!r.ok) throw new Error('not found');
+  return r.text();
+}).then(csv => {
+  Papa.parse(csv, { header:true, dynamicTyping:true, skipEmptyLines:true, complete: res => {
+    if (res.data.length > 100) processData(res.data);
+  }});
+}).catch(() => {});
+
+function loadFile(f) {
+  if (!f) return;
+  Papa.parse(f, { header:true, dynamicTyping:true, skipEmptyLines:true, complete: res => {
+    processData(res.data);
+  }});
+}
+
+function processData(data) {
+  RAW = data;
+  RAW.forEach(r => {
+    r.has_retention_window = r.has_retention_window===true || String(r.has_retention_window).toLowerCase()==='true';
+    r.is_active_day = r.is_active_day===true || String(r.is_active_day).toLowerCase()==='true';
+    ['if_trial','games_played','is_retained_next_30d','has_rfmc','has_nongame_activity_30d',
+     'is_reinstall','was_basic_user','trial_games_played','trial_game_active_days',
+     'nongame_plays_30d','journey_day','w0_games_played','w0_active_days','w0_is_active'].forEach(c => { r[c] = Number(r[c]) || 0; });
+    const dtc = r.days_to_cancel;
+    r.days_to_cancel = (dtc!=null && dtc!=='' && String(dtc)!=='null') ? Number(dtc) : null;
+    r.cancelled_30d = (r.days_to_cancel !== null && r.days_to_cancel <= 30) ? 1 : 0;
+  });
+  if (new Set(RAW.map(r=>r.journey_day)).size > 1) RAW = RAW.filter(r=>r.journey_day===0);
+  document.getElementById('file-upload').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  buildControls();
+  render();
+}
+
+// ================================================================
+// CONTROLS
+// ================================================================
+function buildControls() {
+  const bar = document.getElementById('controls-bar');
+  let html = '<div class="ctrl compare"><label>Compare by</label><select id="cmp-select">';
+  COMPARE_OPTIONS.forEach(o => { html += `<option value="${o.col}">${o.label}</option>`; });
+  html += '</select></div><div class="sep"></div>';
+  FILTERS.forEach(f => {
+    const vals = [...new Set(RAW.map(r=>r[f.col]))].filter(v=>v!=null&&v!=='').sort();
+    if (vals.length < 2) return;
+    html += `<div class="ctrl"><label>${f.label}</label><div class="ms" data-col="${f.col}">` +
+      `<button class="ms-btn" type="button">All</button><div class="ms-drop">` +
+      `<label class="ms-all"><input type="checkbox" checked data-val="__all__"> All</label>`;
+    vals.forEach(v => {
+      html += `<label><input type="checkbox" data-val="${String(v).replace(/"/g,'&quot;')}"> ${fmtVal(f.col,v)}</label>`;
+    });
+    html += '</div></div></div>';
+  });
+  html += '<div class="ctrl"><label>&nbsp;</label><button onclick="resetFilters()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer">Reset</button></div>';
+  bar.innerHTML = html;
+  document.getElementById('cmp-select').addEventListener('change', render);
+
+  // Wire multi-select dropdowns
+  bar.querySelectorAll('.ms').forEach(ms => {
+    const btn = ms.querySelector('.ms-btn');
+    const drop = ms.querySelector('.ms-drop');
+    const allCb = drop.querySelector('input[data-val="__all__"]');
+    const valCbs = [...drop.querySelectorAll('input:not([data-val="__all__"])')];
+    const col = ms.dataset.col;
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Close all other dropdowns first
+      bar.querySelectorAll('.ms-drop.open').forEach(d => { if (d !== drop) d.classList.remove('open'); });
+      drop.classList.toggle('open');
+    });
+
+    function updateBtn() {
+      const checked = valCbs.filter(c => c.checked);
+      if (checked.length === 0 || checked.length === valCbs.length) {
+        allCb.checked = true;
+        valCbs.forEach(c => c.checked = false);
+        btn.innerHTML = 'All';
+      } else {
+        allCb.checked = false;
+        btn.innerHTML = checked.length + ' selected <span class="badge">' + checked.length + '</span>';
+      }
+      render();
+    }
+
+    allCb.addEventListener('change', () => {
+      if (allCb.checked) { valCbs.forEach(c => c.checked = false); }
+      else { allCb.checked = true; } // Can't uncheck All without selecting something
+      updateBtn();
+    });
+
+    valCbs.forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) allCb.checked = false;
+        // If nothing is checked, revert to All
+        if (!valCbs.some(c => c.checked)) allCb.checked = true;
+        updateBtn();
+      });
+    });
+  });
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', () => {
+    bar.querySelectorAll('.ms-drop.open').forEach(d => d.classList.remove('open'));
+  });
+  bar.querySelectorAll('.ms-drop').forEach(d => {
+    d.addEventListener('click', (e) => e.stopPropagation());
+  });
+
+  buildStageBar();
+}
+
+function buildStageBar() {
+  const bar = document.getElementById('stage-bar');
+  let html = '<span class="tl">Stages:</span>';
+  stageOrder.forEach((s, i) => {
+    const chk = s.enabled ? 'checked' : '';
+    html += '<label class="tog">' +
+      '<input type="checkbox" data-stage="' + s.id + '" ' + chk + '> ' + s.label +
+      '<span class="arrows">' +
+        (i > 0 ? '<button class="arr" data-move="' + i + ':-1">&larr;</button>' : '') +
+        (i < stageOrder.length - 1 ? '<button class="arr" data-move="' + i + ':1">&rarr;</button>' : '') +
+      '</span></label>';
+  });
+  bar.innerHTML = html;
+  bar.querySelectorAll('input[data-stage]').forEach(cb => {
+    cb.addEventListener('change', function() {
+      const s = stageOrder.find(x => x.id === this.dataset.stage);
+      if (s) s.enabled = this.checked;
+      render();
+    });
+  });
+  bar.querySelectorAll('button[data-move]').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const [idx, dir] = this.dataset.move.split(':').map(Number);
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= stageOrder.length) return;
+      const tmp = stageOrder[idx];
+      stageOrder[idx] = stageOrder[newIdx];
+      stageOrder[newIdx] = tmp;
+      buildStageBar();
+      render();
+    });
+  });
+}
+
+function resetFilters() {
+  document.querySelectorAll('.ms').forEach(ms => {
+    const allCb = ms.querySelector('input[data-val="__all__"]');
+    const valCbs = ms.querySelectorAll('input:not([data-val="__all__"])');
+    allCb.checked = true;
+    valCbs.forEach(c => c.checked = false);
+    ms.querySelector('.ms-btn').innerHTML = 'All';
+  });
+  render();
+}
+
+function fmtVal(col, v) {
+  if (col==='if_trial') return v==1?'Trial':'Direct';
+  if (col==='is_reinstall') return v==1?'Reinstall':'First install';
+  if (col==='was_basic_user') return v==1?'Was Basic':'Never Basic';
+  if (col==='subscription_period') return v==='1 mon'?'Monthly':v==='1 year'?'Yearly':v;
+  if (col==='cancelled_30d') return v==1?'Cancelled':'Not cancelled';
+  if (col==='is_retained_next_30d') return v==1?'Retained':'Churned';
+  return String(v);
+}
+
+// ================================================================
+// HELPERS
+// ================================================================
+function fmt(n) { return n.toLocaleString(); }
+function pct(a,b) { return b ? ((a/b)*100).toFixed(1) : '0.0'; }
+function retRate(users) {
+  if (users.length < 10) return null;
+  return users.filter(r=>r.is_retained_next_30d===1).length / users.length * 100;
+}
+function cancelRate(users) {
+  if (users.length < 10) return null;
+  return users.filter(r=>r.cancelled_30d===1).length / users.length * 100;
+}
+
+// ================================================================
+// STATS BAR
+// ================================================================
+function renderStats() {
+  const d = FILTERED, n = d.length;
+  const bar = document.getElementById('stats-bar');
+  const ret = d.filter(r=>r.is_retained_next_30d===1);
+  const trial = d.filter(r=>r.if_trial===1), direct = d.filter(r=>r.if_trial===0);
+  const basic = d.filter(r=>r.was_basic_user===1);
+  const canc = d.filter(r=>r.cancelled_30d===1);
+  bar.innerHTML = `
+    <div class="stat"><div class="l">Users (with window)</div><div class="v">${fmt(n)}</div><div class="d">${fmt(trial.length)} trial / ${fmt(direct.length)} direct</div></div>
+    <div class="stat"><div class="l">D31-60 Retention</div><div class="v">${n?pct(ret.length,n):'—'}%</div><div class="d">${fmt(ret.length)} retained</div></div>
+    <div class="stat"><div class="l">30d Cancel Rate</div><div class="v">${n?pct(canc.length,n):'—'}%</div><div class="d">${fmt(canc.length)} cancelled</div></div>
+    <div class="stat"><div class="l">Was Basic</div><div class="v">${pct(basic.length,n)}%</div><div class="d">${fmt(basic.length)} users</div></div>`;
+}
+
+// ================================================================
+// SANKEY BUILDER — shared nodes per stage
+// ================================================================
+function buildSankeyData(data) {
+  const total = data.length;
+  if (!total) return { nodes: [], links: [], stages: [] };
+
+  // Build active stages from stageOrder
+  const stages = stageOrder.filter(s => s.enabled).map(s => s.id);
+  if (stages.length < 2) return { nodes: [], links: [], stages: [] };
+
+  // Define how each stage classifies a user
+  function classify(row, stage) {
+    switch(stage) {
+      case 'plan':  return row.subscription_period === '1 mon' ? 'Monthly' : 'Yearly';
+      case 'basic': return row.was_basic_user === 1 ? 'Was Basic' : 'Never Basic';
+      case 'trial': return row.if_trial === 1 ? 'Trial' : 'Direct';
+      case 'eng':
+        if (row.if_trial === 0) return 'Direct (no trial)';
+        return row.trial_engagement_level === 'trial_3+_game_days' ? '3+ game days'
+             : row.trial_engagement_level === 'trial_1-2_game_days' ? '1-2 game days'
+             : '0 game days';
+      case 'w0':    return row.w0_is_active === 1 ? 'W0 Active' : 'W0 Inactive';
+      case 'canc':  return row.cancelled_30d === 1 ? 'Cancelled' : 'Not cancelled';
+      case 'ret':   return row.is_retained_next_30d === 1 ? 'Retained' : 'Churned';
+    }
+  }
+
+  // Color per stage:value
+  const nodeColorMap = {
+    'plan:Monthly': '#3b82f6', 'plan:Yearly': '#60a5fa',
+    'basic:Was Basic': '#6366f1', 'basic:Never Basic': '#a5b4fc',
+    'trial:Trial': '#9333ea', 'trial:Direct': '#22c55e',
+    'eng:3+ game days': '#7c3aed', 'eng:1-2 game days': '#a78bfa', 'eng:0 game days': '#c4b5fd',
+    'eng:Direct (no trial)': '#4ade80',
+    'w0:W0 Active': '#16a34a', 'w0:W0 Inactive': '#94a3b8',
+    'canc:Cancelled': '#f59e0b', 'canc:Not cancelled': '#a3e635',
+    'ret:Retained': '#16a34a', 'ret:Churned': '#ef4444',
+  };
+
+  // Count flows between consecutive stages
+  // linkMap: "fromStage:fromVal -> toStage:toVal" => count
+  const linkMap = {};
+  // nodeUsers: "stage:val" => [rows] for tooltip stats
+  const nodeUsers = {};
+
+  data.forEach(row => {
+    const path = stages.map(s => classify(row, s));
+    // Track node membership
+    stages.forEach((s, i) => {
+      const key = s + ':' + path[i];
+      if (!nodeUsers[key]) nodeUsers[key] = [];
+      nodeUsers[key].push(row);
+    });
+    // Track links between consecutive stages
+    for (let i = 0; i < stages.length - 1; i++) {
+      const fromKey = stages[i] + ':' + path[i];
+      const toKey = stages[i+1] + ':' + path[i+1];
+      const linkKey = fromKey + '|' + toKey;
+      linkMap[linkKey] = (linkMap[linkKey] || 0) + 1;
+    }
+  });
+
+  // Build nodes — use "stage:value" as ID to keep them unique per column
+  const nodes = [];
+  const seen = new Set();
+  stages.forEach(s => {
+    Object.keys(nodeUsers).forEach(key => {
+      if (!key.startsWith(s + ':')) return;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const val = key.slice(s.length + 1);
+      const users = nodeUsers[key];
+      const r = retRate(users);
+      const c = cancelRate(users);
+      const rStr = r !== null ? r.toFixed(0) + '%' : '-';
+      const cStr = c !== null ? c.toFixed(0) + '%' : '-';
+      nodes.push({
+        id: key,
+        name: val,
+        color: nodeColorMap[key] || '#64748b',
+        custom: { count: users.length, ret: rStr, canc: cStr },
+      });
+    });
+  });
+
+  // Build links
+  const links = Object.entries(linkMap).map(([key, weight]) => {
+    const [from, to] = key.split('|');
+    return [from, to, weight];
+  });
+
+  // Stage labels for column headers
+  const stageLabels = {
+    plan: 'Plan', basic: 'Was Basic?', trial: 'Trial Path',
+    eng: 'Trial Engagement', w0: 'W0 Activation', canc: 'Cancelled 30d', ret: 'Retention',
+  };
+  const activeStageNames = stages.map(s => stageLabels[s] || s);
+
+  return { nodes, links, stages: activeStageNames };
+}
+
+// ================================================================
+// RENDER
+// ================================================================
+function renderSankey(containerId, data, chartHeight) {
+  const container = document.getElementById(containerId);
+  if (!container) { console.error('Container not found:', containerId); return; }
+
+  const { nodes, links, stages } = buildSankeyData(data);
+  if (!links.length) {
+    container.innerHTML = '<p style="color:var(--muted);padding:40px;text-align:center">No data for current filters</p>';
+    return;
+  }
+
+  try {
+    const chart = Highcharts.chart(container, {
+      chart: {
+        height: chartHeight || 600,
+        backgroundColor: 'transparent',
+        spacing: [30, 10, 10, 10],
+        events: {
+          render: function() {
+            const ch = this;
+            // Remove old stage labels
+            (ch._stageLabels || []).forEach(l => l.destroy());
+            ch._stageLabels = [];
+            // Compute column x positions from node positions
+            const series = ch.series[0];
+            if (!series || !series.nodes) return;
+            const colMap = {};
+            series.nodes.forEach(n => {
+              if (n.graphic) {
+                const x = n.nodeX != null ? ch.plotLeft + n.nodeX + 10 : null;
+                const col = n.column != null ? n.column : null;
+                if (col !== null && x !== null) {
+                  if (!colMap[col] || x < colMap[col]) colMap[col] = x;
+                }
+              }
+            });
+            const cols = Object.keys(colMap).map(Number).sort((a,b) => a - b);
+            cols.forEach((col, i) => {
+              if (i < stages.length) {
+                const lbl = ch.renderer.text(
+                  stages[i], colMap[col], 18
+                ).css({
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }).add();
+                ch._stageLabels.push(lbl);
+              }
+            });
+          }
+        },
+      },
+      title: { text: null },
+      credits: { enabled: false },
+      tooltip: {
+        useHTML: true,
+        nodeFormatter: function() {
+          const c = this.point.custom || {};
+          return '<b>' + this.point.name + '</b><br/>' +
+            'Users: <b>' + fmt(c.count || this.point.sum) + '</b><br/>' +
+            'D31-60 Retention: <b>' + (c.ret || '-') + '</b><br/>' +
+            '30d Cancel Rate: <b>' + (c.canc || '-') + '</b>';
+        },
+        pointFormat: '{point.fromNode.name} &rarr; {point.toNode.name}<br/><b>{point.weight:,.0f}</b> users',
+      },
+      plotOptions: {
+        sankey: {
+          // Disable built-in hover dimming so it doesn't fight click highlights
+          states: {
+            hover: { enabled: false },
+            inactive: { enabled: false },
+          },
+          point: {
+            events: {
+              click: function() {
+                const pt = this;
+                const chart = pt.series.chart;
+                const series = pt.series;
+                const node = pt.isNode ? pt : (pt.toNode || null);
+                if (!node) return;
+
+                // Get all links by scanning series.points
+                const allLinks = series.points.filter(p => p.fromNode && p.toNode);
+
+                // Build adjacency from link data
+                const downMap = {}; // nodeId -> [{link, toNode}]
+                const upMap = {};   // nodeId -> [{link, fromNode}]
+                allLinks.forEach(link => {
+                  const fid = link.fromNode.id;
+                  const tid = link.toNode.id;
+                  if (!downMap[fid]) downMap[fid] = [];
+                  downMap[fid].push({ link, node: link.toNode });
+                  if (!upMap[tid]) upMap[tid] = [];
+                  upMap[tid].push({ link, node: link.fromNode });
+                });
+
+                // Trace full path
+                const pathLinkSet = new Set();
+                const pathNodeSet = new Set();
+                pathNodeSet.add(node.id);
+
+                function traceDown(nid) {
+                  (downMap[nid] || []).forEach(({ link, node: n }) => {
+                    if (pathLinkSet.has(link.index)) return;
+                    pathLinkSet.add(link.index);
+                    pathNodeSet.add(n.id);
+                    traceDown(n.id);
+                  });
+                }
+                function traceUp(nid) {
+                  (upMap[nid] || []).forEach(({ link, node: n }) => {
+                    if (pathLinkSet.has(link.index)) return;
+                    pathLinkSet.add(link.index);
+                    pathNodeSet.add(n.id);
+                    traceUp(n.id);
+                  });
+                }
+                traceDown(node.id);
+                traceUp(node.id);
+
+                // Toggle
+                const alreadyActive = chart._activeNode === node.id;
+                chart._activeNode = alreadyActive ? null : node.id;
+
+                // Apply styles via inline element.style (persists over HC state changes)
+                allLinks.forEach(link => {
+                  if (link.graphic && link.graphic.element) {
+                    link.graphic.element.style.opacity = alreadyActive ? '' : (pathLinkSet.has(link.index) ? '0.7' : '0.04');
+                  }
+                });
+                series.nodes.forEach(n => {
+                  const inPath = alreadyActive || pathNodeSet.has(n.id);
+                  if (n.graphic && n.graphic.element) {
+                    n.graphic.element.style.opacity = inPath ? '' : '0.15';
+                  }
+                  if (n.dataLabel && n.dataLabel.element) {
+                    n.dataLabel.element.style.opacity = inPath ? '' : '0.15';
+                  }
+                });
+              }
+            }
+          }
+        }
+      },
+      series: [{
+        type: 'sankey',
+        name: 'User Journey',
+        keys: ['from', 'to', 'weight'],
+        nodes: nodes,
+        data: links,
+        colorByPoint: true,
+        nodeWidth: 20,
+        nodePadding: 14,
+        curveFactor: 0.5,
+        linkOpacity: 0.35,
+        dataLabels: {
+          enabled: true,
+          useHTML: true,
+          style: { color: '#1e293b', textOutline: 'none', fontSize: '11px' },
+          nodeFormatter: function() {
+            const c = this.point.custom || {};
+            const n = fmt(c.count || 0);
+            const r = c.ret || '-';
+            const ca = c.canc || '-';
+            return '<div style="color:#1e293b;text-shadow:0 0 3px #fff,0 0 3px #fff">' +
+              '<b>' + this.point.name + '</b>' +
+              '<br/><span style="font-size:9px;color:#475569">' + n + ' · ret ' + r + ' · canc ' + ca + '</span></div>';
+          },
+        },
+      }],
+    });
+  } catch(e) {
+    console.error('Highcharts error:', e);
+    container.innerHTML = '<p style="color:red;padding:20px">Chart error: ' + e.message + '</p>';
+  }
+}
+
+function render() {
+  // Read multi-select filters: col -> [array of selected values]
+  const activeFilters = {};
+  document.querySelectorAll('.ms').forEach(ms => {
+    const col = ms.dataset.col;
+    const allCb = ms.querySelector('input[data-val="__all__"]');
+    if (allCb && allCb.checked) return; // All = no filter
+    const checked = [...ms.querySelectorAll('input:not([data-val="__all__"]):checked')];
+    if (checked.length > 0) {
+      activeFilters[col] = checked.map(c => c.dataset.val);
+    }
+  });
+  FILTERED = RAW.filter(r => {
+    if (!r.has_retention_window) return false;
+    for (const [c, vals] of Object.entries(activeFilters)) {
+      if (!vals.includes(String(r[c]))) return false;
+    }
+    return true;
+  });
+
+  const parts = Object.entries(activeFilters).map(([c, vals]) => {
+    const f = FILTERS.find(x => x.col === c);
+    const label = f ? f.label : c;
+    const display = vals.length <= 2 ? vals.map(v => fmtVal(c, v)).join(', ') : vals.length + ' selected';
+    return `${label}=${display}`;
+  });
+  document.getElementById('filter-summary').textContent = parts.length ? 'Filtered: ' + parts.join(' | ') : '';
+
+  renderStats();
+
+  const cmpCol = document.getElementById('cmp-select').value;
+  const wrap = document.querySelector('.chart-wrap');
+
+  if (cmpCol === '__none__') {
+    wrap.innerHTML = '<div class="chart-card"><div id="sankey-0" style="min-height:550px"></div></div>';
+    requestAnimationFrame(() => renderSankey('sankey-0', FILTERED, 550));
+  } else {
+    const vals = [...new Set(FILTERED.map(r => r[cmpCol]))].filter(v => v != null && v !== '').sort();
+    let html = '<div class="compare-grid">';
+    vals.forEach((v, i) => {
+      html += '<div class="compare-panel"><div class="chart-card">' +
+        '<h4 style="color:' + PALETTE[i % PALETTE.length] + '">' + fmtVal(cmpCol, v) + ' (n=' + fmt(FILTERED.filter(r => String(r[cmpCol]) === String(v)).length) + ')</h4>' +
+        '<div id="sankey-' + i + '" style="min-height:500px"></div></div></div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+    requestAnimationFrame(() => {
+      vals.forEach((v, i) => {
+        const subset = FILTERED.filter(r => String(r[cmpCol]) === String(v));
+        renderSankey('sankey-' + i, subset, 500);
+      });
+    });
+  }
+}
+</script>
+</body>
+</html>

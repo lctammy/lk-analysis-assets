@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cancellation Deep Dive — First-Level Insights</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root { --bg: #1e1245; --card: #2a1a5c; --border: #3d2d6e; --text: #F8F2E9; --muted: #CBC2FF;
+    --accent: #FF9500; --red: #ef4444; --green: #23A455; --yellow: #FF9500; --orange: #FF9500; --blue: #4F67FF; --purple: #A51CC6; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Gotham Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 16px 24px; }
+  h1 { font-size: 26px; margin-bottom: 2px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  /* Slide-like sections */
+  .slide { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .slide:last-child { border-bottom: none; }
+  h2 { font-size: 18px; margin: 0 0 10px; color: var(--text); }
+  h3 { font-size: 14px; margin: 8px 0 6px; color: var(--muted); }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .kpi { background: var(--card); border-radius: 16px; padding: 14px 16px; border: 1px solid var(--border); }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi .value { font-size: 24px; font-weight: 700; margin: 2px 0; }
+  .kpi .detail { font-size: 11px; color: var(--muted); }
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+  .chart-card { background: var(--card); border-radius: 16px; padding: 14px; border: 1px solid var(--border); }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-card canvas { max-height: 280px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .highlight { color: var(--red); font-weight: 600; }
+  .good { color: var(--green); font-weight: 600; }
+  .takeaway { font-size: 12px; color: var(--muted); line-height: 1.6; padding: 8px 12px; background: var(--card); border-left: 3px solid var(--accent); border-radius: 0 12px 12px 0; margin: 4px 0 0; }
+  .takeaway strong { color: var(--accent); }
+  .takeaway.warn { border-left-color: var(--yellow); }
+  .takeaway.danger { border-left-color: var(--red); }
+  .takeaway.success { border-left-color: var(--green); }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+  .tag-red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .tag-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .tag-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .def-box { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; font-size: 11px; line-height: 1.6; }
+  .def-box dt { color: var(--accent); font-weight: 600; display: inline; }
+  .def-box dd { display: inline; margin-left: 4px; margin-right: 12px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  /* Navigation */
+  .toc { position: sticky; top: 0; z-index: 100; background: var(--bg); padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+  .toc a { color: var(--muted); font-size: 11px; text-decoration: none; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); white-space: nowrap; transition: all .15s; }
+  .toc a:hover, .toc a.active { color: var(--text); border-color: var(--accent); background: rgba(99,102,241,0.1); }
+  .toc .sep { color: var(--red); font-weight: 700; font-size: 10px; padding: 0 2px; }
+  .toc .toc-ctrl { margin-left: auto; border-color: var(--accent); color: var(--accent); cursor: pointer; }
+  /* Collapsible sections */
+  .slide h2 { cursor: pointer; user-select: none; }
+  .slide h2::after { content: ' ▾'; font-size: 12px; color: var(--muted); }
+  .slide.collapsed h2::after { content: ' ▸'; }
+  .slide.collapsed > *:not(h2) { display: none !important; }
+  @media (max-width: 900px) { .chart-grid, .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<script>mermaid.initialize({ theme: 'dark', themeVariables: { primaryColor: '#FF9500', primaryTextColor: '#F8F2E9', lineColor: '#CBC2FF', fontSize: '12px' } });</script>
+<div class="container">
+
+<h1>Cancellation Deep Dive</h1>
+<p class="subtitle">Source: sandbox.lingokids_tammyliang_content.cancellation_daily_segments | <strong>Pool snapshot: Mar 25 2026</strong> | <strong>"/day" = avg of Mar 9-25 (17 days)</strong> | Engagement windows: 7d and 30d rolling before each cancel day | <span style="color:var(--yellow)">Static snapshot — rerun dbt model to refresh</span></p>
+
+<nav class="toc">
+  <a href="#s1">1.1 Pool</a>
+  <a href="#s2">1.2 Drivers</a>
+  <a href="#s3">1.3 Combos</a>
+  <span class="sep">CHURN DEFLECTION ▸</span>
+  <a href="#s4">2.1 Daily Flow</a>
+  <a href="#s5">2.2 Framework</a>
+  <a href="#s7">2.3 Revenue</a>
+  <a href="#s6">2.4 Repeat ∅</a>
+  <a href="#s8">2.5 Actions</a>
+  <span class="sep" style="color:var(--yellow)">WIN-BACK ▸</span>
+  <a href="#s9" style="color:var(--yellow);border-color:var(--yellow)">3.1 Win-Back</a>
+  <a href="#" class="toc-ctrl" onclick="document.querySelectorAll('.slide').forEach(s=>s.classList.toggle('collapsed'));return false">Toggle All</a>
+</nav>
+
+<!-- ============ SECTION 1.1: The Pool ============ -->
+<div class="slide" id="s1">
+<h2>1.1 The Pool — 607K Subscribers, 27% Canceled</h2>
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi"><div class="label">Subscriber Base</div><div class="value">607K</div><div class="detail">606,805 active subscribers</div></div>
+  <div class="kpi"><div class="label">Active Canceled</div><div class="value" style="color:var(--red)">165K</div><div class="detail">27.2% of base (164,987)</div></div>
+  <div class="kpi"><div class="label">Canceled Playing</div><div class="value" style="color:var(--yellow)">16.4K</div><div class="detail">9.9% of canceled pool</div></div>
+  <div class="kpi"><div class="label">Repeat Cancellers</div><div class="value" style="color:var(--orange)">57K</div><div class="detail">34% of canceled pool (2+ cancels, post-dedup)</div></div>
+  <div class="kpi"><div class="label">Pool: Yearly</div><div class="value">87%</div><div class="detail">143K yearly vs 22K monthly</div></div>
+  <div class="kpi"><div class="label">Early Cancel Rate</div><div class="value">6.5%</div><div class="detail">daily cancels / 30d new sub pool</div></div>
+</div>
+
+<!-- Global framing: two problems -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+  <div style="background:var(--card);border-radius:10px;padding:14px 16px;border:2px solid var(--red)">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--red);font-weight:700;margin-bottom:4px">Problem A — Churn Deflection</div>
+    <div style="font-size:22px;font-weight:700">1,805 cancels/day</div>
+    <p style="font-size:12px;color:var(--muted);margin-top:4px">New cancellations we can intercept with deflection flows, offers, or messaging. 45% are repeat cancellers (2+ lifetime cancels) who play 31 games/week.<br>
+    <strong style="color:var(--text)">Sections 2.1–2.5</strong> → segment, size, prioritize interventions</p>
+  </div>
+  <div style="background:var(--card);border-radius:10px;padding:14px 16px;border:2px solid var(--yellow)">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);font-weight:700;margin-bottom:4px">Problem B — Win-Back</div>
+    <div style="font-size:22px;font-weight:700">16.4K playing today</div>
+    <p style="font-size:12px;color:var(--muted);margin-top:4px">Canceled users who still play (9.6% of 164K pool). They love the product — they just don't pay. 80% yearly, avg 85 games/7d.<br>
+    <strong style="color:var(--text)">Section 3.1</strong> → re-subscription offers, in-app messaging</p>
+  </div>
+</div>
+<div class="chart-grid">
+  <div class="chart-card"><canvas id="chart_daily_trend"></canvas></div>
+  <div class="chart-card"><canvas id="chart_cancel_vs_new"></canvas></div>
+</div>
+
+<h3 style="margin-top:10px">Daily Cancel Rate by Segment</h3>
+<p style="font-size:11px;color:var(--muted);margin-bottom:6px">What % of each segment's base cancels per day (Mar 16). Higher = faster churn velocity.</p>
+<div class="chart-grid">
+  <div class="chart-card full"><canvas id="chart_daily_rate_segments" style="min-height:320px"></canvas></div>
+</div>
+
+<div class="takeaway">
+  <strong>607K subscribers, 165K canceled (27%).</strong> Canceled % stable at 27-29% since Sep — base and pool grow together.<br>
+  <strong>Monthly cancels 3× faster than yearly</strong> (0.56% vs 0.18% daily rate). basic_upgrade 1.7× faster than first_time (0.45% vs 0.26%).<br>
+  <strong>Pool is 88% yearly</strong> (144K yearly vs 20K monthly) because yearly accumulates — monthly cancel fast but also churn out fast.
+</div>
+</div>
+
+<!-- ============ SECTION 2: Single Dimensions ============ -->
+<div class="slide" id="s2">
+<h2>1.2 What Drives Cancellation — Single Dimensions</h2>
+<div class="def-box">
+  <dl><dt>Bar length</dt><dd>= cancel % (pool snapshot: what % of that segment is currently in canceled status). Yearly looks higher because canceled yearly users sit in the pool for up to 12 months; monthly cancels expire in ~30 days. <strong>Monthly actually cancels 3× faster</strong> (0.56% vs 0.18% daily rate).</dd>
+  <dt>Flat dimensions (&lt;2pp spread)</dt><dd>= reinstall, country, conversion trigger — don't matter.</dd>
+  <dt>Key dimensions</dt><dd>= yearly/monthly (+8pp), trial/direct (+7pp), platform (+8pp), subscriber history (+8pp).</dd></dl>
+</div>
+<div class="chart-grid">
+  <div class="chart-card full"><canvas id="chart_dim_timing_v2" style="max-height:500px"></canvas></div>
+</div>
+
+<h3 style="margin-top:12px">Dimension Detail — When & How Long</h3>
+<p style="font-size:11px;color:var(--muted);margin-bottom:8px">
+  <strong style="color:#ef4444">Days to cancel</strong> = when in billing cycle they cancel (monthly: 3 buckets, yearly: 5 buckets).
+  <strong style="color:#22c55e">Tenure</strong> = total subscription relationship length at cancellation (5 buckets). Different measures — a user with 2yr tenure can cancel on day 0 of their current sub.
+</p>
+<div class="chart-card full" style="overflow-x:auto;margin-bottom:8px">
+  <table id="dim_table_v2">
+    <tr>
+      <th></th><th>Dimension</th><th>Value</th><th>Subs</th><th>Pool %<br><span style="font-size:8px;font-weight:400;color:var(--muted)">currently canceled</span></th>
+      <th style="min-width:130px;text-align:center"><span style="color:#ef4444">Mo Cancel</span><br><span style="font-size:8px;font-weight:400;color:var(--muted)">0d · 1w · 1m</span></th>
+      <th style="min-width:130px;text-align:center"><span style="color:#3b82f6">Yr Cancel</span><br><span style="font-size:8px;font-weight:400;color:var(--muted)">0d · 1w · 1m · 6m · 6m+</span></th>
+      <th style="min-width:130px;text-align:center"><span style="color:#22c55e">Tenure</span><br><span style="font-size:8px;font-weight:400;color:var(--muted)">1m · 3m · 6m · 1y · 1y+</span></th>
+    </tr>
+  </table>
+</div>
+
+<div class="takeaway">
+  <strong>Dimensions that matter:</strong> Yearly vs Monthly (+24pp pool — but misleading: monthly drains fast, yearly accumulates. Monthly daily cancel rate is actually 3× higher) · Trial vs Direct (+7pp) · Apple vs Google (+8pp) · Subscriber history (basic_upgrade highest).<br>
+  <strong>Dimensions that don't:</strong> Reinstall (~0pp), country (~1pp), conversion trigger (~1pp).<br>
+  <strong>Mo cancel (red):</strong> Always right-skewed (~50% at 8-30d). Barely varies — monthly churn timing is structural.<br>
+  <strong>Yr cancel (blue):</strong> U-shape varies. basic_upgrade → sharp day-0 (30%). Direct → 36% at 6mo+ (renewal). Tenure d181+ → 66% at 6mo+.<br>
+  <strong>Tenure (green):</strong> first_install = 46% under 30d tenure (truly new). Reinstalls = 25% over 1yr (long relationship, keeps returning). basic_upgrade = 44% under 30d (just upgraded, quickly churning).
+</div>
+</div>
+
+<!-- ============ SECTION 3: Cross Dimensions + Bridge ============ -->
+<div class="slide" id="s3">
+<h2>1.3 Segment Combinations — Rate vs Volume Trade-off</h2>
+<p style="font-size:12px;color:var(--muted);margin-bottom:10px">High cancel rate ≠ high daily volume. basic_upgrade × yearly_trial has 46.8% cancel rate but only 38 daily cancels. first_time × monthly_trial has 9.0% rate but 392/day. We need both views.</p>
+
+<div class="chart-grid">
+  <div class="chart-card"><canvas id="chart_sub_history"></canvas></div>
+  <div class="chart-card">
+    <h3>Cancel Rate Heatmap</h3>
+    <table id="heatmap_table">
+      <tr><th>History</th><th>Plan</th><th>Users</th><th>Pool %</th><th>Play %</th></tr>
+    </table>
+  </div>
+</div>
+
+<h3 style="margin-top:12px">The Bridge: Pool Cancel Rate vs Daily Volume</h3>
+<div class="chart-grid">
+  <div class="chart-card full">
+    <table>
+      <tr><th>Segment</th><th>Pool Size</th><th>Cancel Rate</th><th>Daily Cancels</th><th>Games/7d</th><th>Canceled & Playing</th></tr>
+      <tr><td>first_time × monthly_trial</td><td>80K</td><td class="good">9.0%</td><td><strong class="highlight">392</strong></td><td>15.9</td><td>741</td></tr>
+      <tr><td>first_time × yearly_trial</td><td>224K</td><td class="highlight">34.4%</td><td><strong class="highlight">386</strong></td><td>14.3</td><td>5,800</td></tr>
+      <tr><td>first_time × monthly_direct</td><td>56K</td><td>10.3%</td><td><strong>314</strong></td><td>33.5</td><td>1,018</td></tr>
+      <tr><td>returning × monthly_direct</td><td>27K</td><td>13.7%</td><td>204</td><td>39.9</td><td>610</td></tr>
+      <tr><td>basic_upgrade × monthly_direct</td><td>17K</td><td>18.9%</td><td>161</td><td>44.4</td><td>641</td></tr>
+      <tr><td>first_time × yearly_direct</td><td>76K</td><td>28.3%</td><td>125</td><td>20.0</td><td>2,000</td></tr>
+      <tr><td>returning × yearly_trial</td><td>45K</td><td class="highlight">42.8%</td><td>96</td><td>22.9</td><td>1,809</td></tr>
+      <tr><td>returning × yearly_direct</td><td>38K</td><td class="highlight">33.8%</td><td>68</td><td>41.3</td><td>1,380</td></tr>
+      <tr><td><strong>basic_upgrade × yearly_trial</strong></td><td>15K</td><td class="highlight"><strong>46.8%</strong></td><td>38</td><td>22.2</td><td>842</td></tr>
+      <tr><td>basic_upgrade × yearly_direct</td><td>17K</td><td class="highlight">35.4%</td><td>35</td><td>26.4</td><td>738</td></tr>
+    </table>
+    <p style="font-size:10px;color:var(--muted);margin-top:4px">Sorted by daily cancels. <strong>basic_upgrade × yearly_trial has the highest cancel RATE (46.8%) but ranks #9 in daily volume (38/day).</strong> The top 3 daily segments are all first_time subscribers.</p>
+  </div>
+</div>
+
+<h3 style="margin-top:12px;cursor:pointer;user-select:none" onclick="document.getElementById('behavior_compare').style.display=document.getElementById('behavior_compare').style.display==='none'?'block':'none';this.querySelector('span').textContent=document.getElementById('behavior_compare').style.display==='none'?'▸':'▾'">
+  Behavioral Gap: Canceled vs Not-Canceled <span style="font-size:12px;color:var(--muted)">▸</span>
+</h3>
+<div id="behavior_compare" style="display:none">
+
+<p style="font-size:11px;color:var(--muted);margin-bottom:8px">Same active subscriber pool (Mar 16), split by whether they've canceled current sub. Do cancelers behave differently?</p>
+
+<div class="chart-grid">
+  <div class="chart-card full">
+    <h3 style="margin-bottom:6px">By Plan — Canceled vs Not-Canceled</h3>
+    <table>
+      <tr>
+        <th>Plan</th><th>Status</th><th>Users</th>
+        <th>% Playing</th><th>Play Days/7d</th><th>Active Days/7d</th>
+        <th>Games/7d</th><th>Unique Games/7d</th><th>Games/30d</th>
+        <th>Gap</th>
+      </tr>
+      <tr><td rowspan="2" style="font-weight:600">Monthly</td>
+        <td><span class="tag tag-green">active</span></td><td>167K</td>
+        <td>17.7%</td><td>1.31</td><td>1.45</td><td>33.9</td><td>22.0</td><td>134.6</td>
+        <td rowspan="2" style="vertical-align:middle;font-size:13px;color:var(--yellow);font-weight:600">~10% less</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">canceled</span></td><td>21K</td>
+        <td>16.1%</td><td>1.29</td><td>1.46</td><td>30.5</td><td>20.3</td><td>120.2</td>
+      </tr>
+      <tr style="border-top:2px solid var(--border)"><td rowspan="2" style="font-weight:600">Yearly</td>
+        <td><span class="tag tag-green">active</span></td><td>271K</td>
+        <td>14.8%</td><td>1.13</td><td>1.25</td><td>25.6</td><td>17.4</td><td>108.6</td>
+        <td rowspan="2" style="vertical-align:middle;font-size:13px;color:var(--red);font-weight:600">~43% less</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">canceled</span></td><td>144K</td>
+        <td style="color:var(--red)">9.4%</td><td style="color:var(--red)">0.74</td><td>0.83</td><td style="color:var(--red)">14.6</td><td style="color:var(--red)">10.2</td><td style="color:var(--red)">64.0</td>
+      </tr>
+    </table>
+    <p style="font-size:10px;color:var(--muted);margin-top:4px">
+      <strong style="color:var(--yellow)">Monthly cancelers ≈ non-cancelers.</strong> Nearly identical play (1.29 vs 1.31 days/wk). They cancel to manage billing, not because they stopped using the app.<br>
+      <strong style="color:var(--red)">Yearly cancelers are distinctly disengaged.</strong> 43% fewer games, 5.4pp lower play rate. Engagement drops well before the cancel event.
+    </p>
+  </div>
+</div>
+
+<div class="chart-grid" style="margin-top:8px">
+  <div class="chart-card full" style="overflow-x:auto">
+    <h3 style="margin-bottom:6px">By Segment — Where the Gap Is Biggest</h3>
+    <table id="behavior_segment_table">
+      <tr>
+        <th>Segment</th><th colspan="2" style="text-align:center;border-bottom:2px solid var(--green)">Not Canceled</th><th colspan="2" style="text-align:center;border-bottom:2px solid var(--red)">Canceled</th><th colspan="3" style="text-align:center;border-bottom:2px solid var(--accent)">Delta</th>
+      </tr>
+      <tr>
+        <th></th>
+        <th>% Playing</th><th>Games/7d</th>
+        <th>% Playing</th><th>Games/7d</th>
+        <th>Play Gap</th><th>Games Gap</th><th>Signal</th>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<div class="chart-grid" style="margin-top:8px">
+  <div class="chart-card" style="min-height:400px"><canvas id="chart_behavior_gap" style="height:380px"></canvas></div>
+  <div class="chart-card">
+    <div class="takeaway danger" style="margin:0 0 8px">
+      <strong>Yearly cancelers show clear engagement decay.</strong> Across all segments, yearly canceled users play 35-50% less. This gap is a leading indicator — engagement drops before cancellation.
+    </div>
+    <div class="takeaway warn" style="margin:0 0 8px">
+      <strong>Monthly cancelers are behaviorally indistinguishable.</strong> The gap is &lt;10% in most segments. They cancel to pause billing, not because they disengaged. This is subscription management, not churn.
+    </div>
+    <div class="takeaway success" style="margin:0">
+      <strong>Implication:</strong> Yearly deflection should focus on re-engagement (content, value). Monthly deflection should focus on commitment (yearly upsell, lock-in).
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="takeaway warn" style="margin-bottom:8px">
+  <strong>Two different problems:</strong><br>
+  <strong>Churn deflection (daily flow):</strong> Top 3 daily segments are first_time × monthly_trial (392/day), first_time × yearly_trial (386/day), first_time × monthly_direct (314/day). These drive volume.<br>
+  <strong>Intervention (pool):</strong> Highest cancel rates are returning × yearly (43%), basic_upgrade × yearly (47%). Small daily flow but large accumulated pool (5,800 + 1,809 + 842 = 8,451 canceled & still playing).
+</div>
+
+<!-- Transition banner -->
+<div style="text-align:center;padding:16px 0;margin:4px 0">
+  <div style="display:inline-block;background:var(--card);border:2px solid var(--red);border-radius:8px;padding:8px 24px;font-size:14px;font-weight:600;color:var(--red);letter-spacing:1px">
+    PROBLEM A: CHURN DEFLECTION
+  </div>
+</div>
+
+</div>
+
+<!-- ============ SECTION 2.1: Daily Cancel Anatomy ============ -->
+<div class="slide" id="s4">
+<h2>2.1 Daily Cancellations — 1,805/Day We Can Act On</h2>
+<p style="font-size:12px;color:var(--muted);margin-bottom:10px">From the pool, 1,805 new cancellations happen each day (Mar 9-25 avg, post-dedup). 60% monthly, 40% yearly. Split by plan, frequency, engagement, and timing.</p>
+
+<div class="chart-grid">
+  <div class="chart-card full"><canvas id="chart_cancel_rate_by_plan"></canvas></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:8px">
+  <div class="chart-card" style="padding:10px;overflow:hidden"><canvas id="chart_daily_by_freq" style="height:260px"></canvas></div>
+  <div class="chart-card" style="padding:10px;overflow:hidden"><canvas id="chart_daily_by_engagement" style="height:260px"></canvas></div>
+  <div class="chart-card" style="padding:10px;overflow:hidden"><canvas id="chart_segment_timing_mo" style="height:260px"></canvas></div>
+  <div class="chart-card" style="padding:10px;overflow:hidden"><canvas id="chart_segment_timing_yr" style="height:260px"></canvas></div>
+</div>
+<div class="chart-grid">
+  <div class="chart-card full"><canvas id="chart_inactivity_cancel"></canvas></div>
+</div>
+<div class="takeaway danger">
+  <strong>45% of daily cancels are repeat cancellers (2+ lifetime cancels, 819/day).</strong> They're active players (31 games/7d). First-time cancellers = 54% but less predictable.<br>
+  <strong>Inactivity is the strongest predictor of cancellation.</strong> Monthly: 2.2× cancel gap (4.45% inactive vs 2.04% heavy). Yearly: 5× gap (0.30% vs 0.06%). More play = monotonically lower cancel rate.
+</div>
+</div>
+
+<!-- ============ SECTION 5: Intervention Framework ============ -->
+<div class="slide" id="s5">
+<h2>2.2 Intervention Framework — Where to Act</h2>
+<p style="font-size:12px;color:var(--muted);margin-bottom:10px">1,805 cancellations/day (Mar 9-25 avg, post-dedup). Each assigned to a MECE intervention segment via decision tree. Numbers from cancellation_daily_segments model.</p>
+
+<h3>Decision Tree — How 1,805 Daily Cancels Split</h3>
+<div class="chart-card full" style="padding:16px 20px;margin-bottom:10px;overflow-x:auto">
+<pre class="mermaid">
+flowchart LR
+    A["🎯 1,805\ncancels/day"] --> B{"Repeat canceller?\n≥2 lifetime cancels"}
+    B -->|"YES · 819 (45%)"| S1["🔴 repeat\n819/day · $30.5 avg · 68% monthly\nBEFORE: 1.03 play days · 25 games/7d\nAFTER: 1.14 play days · 28 games/7d\n▲ +11% play — ACTIVE, not disengaged"]
+    S1 --> A1["💬 Longer-term commitment\nReturn 90d: 7.3% (avg 39d)\nAsk: why cancel?\n3mo lock or yearly upsell\n⚠ $25K/day at risk"]
+    B -->|"NO · 986 (55%)"| C{"Same-day cancel?\ndays_to_cancel ≤ 0"}
+    C -->|"YES · 235 (13%)"| S2["🟠 same_day\n235/day · $38.8 avg · 55% monthly\n77% trial converts · cancel day 0\nActively engage AFTER cancel (1.9 play days/7d)"]
+    S2 --> A2["💬 Amazon Prime style\nReturn 90d: 1.2% (avg 26d)\nClean confirm + what you'll miss\n⚠ $9K/day at risk"]
+    C -->|"NO · 751 (42%)"| D{"Playing today?"}
+    D -->|"YES · 133 (7%)"| S3["🟡 engaged\n133/day · $37.6 avg · 56% monthly\nBEFORE: 2.08 play days · 66 games/7d\nAFTER: 2.48 play days · 68 games/7d\n▲ +19% play — highest engagement"]
+    S3 --> A3["💬 Loss aversion\nReturn 90d: 0.5% (avg 23d)\nYou played X days! + discount\n✅ Best save rate expected\n⚠ $5K/day at risk"]
+    D -->|"NO · 618 (34%)"| S4["⚪ disengaged/other\n618/day · $40.3 avg · 50% monthly\nBEFORE: 0.0 play days · 0 games/7d\nAFTER: 0.31 play days · 5 games/7d\n▽ No activity — lowest save potential"]
+    S4 --> A4["💬 New content alert\nReturn 90d: 0.1% (avg 31d)\nExpiry reminder or reason survey\n⚠ $24K/day at risk"]
+
+    style A fill:#1e293b,stroke:#6366f1,color:#e0e0e0
+    style S1 fill:#991b1b,stroke:#ef4444,color:#fca5a5
+    style S2 fill:#9a3412,stroke:#f97316,color:#fdba74
+    style S3 fill:#854d0e,stroke:#eab308,color:#fde047
+    style S4 fill:#374151,stroke:#8b8fa3,color:#d1d5db
+    style A1 fill:#1a1d27,stroke:#ef4444,color:#fca5a5
+    style A2 fill:#1a1d27,stroke:#f97316,color:#fdba74
+    style A3 fill:#1a1d27,stroke:#eab308,color:#fde047
+    style A4 fill:#1a1d27,stroke:#8b8fa3,color:#d1d5db
+</pre>
+</div>
+
+<h3>Engagement Profile by Intervention Segment</h3>
+<div class="chart-grid">
+  <div class="chart-card full">
+    <table>
+      <tr>
+        <th>Segment</th><th style="min-width:150px">Daily Vol</th><th>Mo%</th><th>Avg Price</th>
+        <th>Play Days /7d<br><span style="font-size:8px;font-weight:400;color:var(--muted)">before → after (Δ)</span></th>
+        <th>Games /7d<br><span style="font-size:8px;font-weight:400;color:var(--muted)">before → after (Δ)</span></th>
+        <th>Trend<br><span style="font-size:8px;font-weight:400;color:var(--muted)">wk-over-wk<br>before cancel</span></th>
+        <th style="border-left:2px solid var(--border)">Peak Tenure<br><span style="font-size:8px;font-weight:400;color:var(--muted)">Mo · Yr</span></th>
+        <th style="border-left:2px solid var(--border)">Return 90d</th><th>Avg Days</th>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">repeat (2+)</span></td>
+        <td><strong>819</strong> <span style="font-size:10px;color:var(--muted)">45%</span><div style="background:var(--border);border-radius:3px;height:5px;margin-top:2px"><div style="background:#ef4444;height:100%;border-radius:3px;width:100%"></div></div></td><td>68%</td><td>$30.5</td>
+        <td>1.03<br><span style="font-size:10px;color:var(--green)">→ 1.14 (+11%)</span></td>
+        <td>25.4<br><span style="font-size:10px;color:var(--green)">→ 28.4 (+12%)</span></td>
+        <td style="color:var(--muted)">-0.08</td>
+        <td style="border-left:2px solid var(--border);font-size:10px;line-height:1.4">Mo: 42% at 15-30d<br>Yr: 31% at 181-365d</td>
+        <td style="border-left:2px solid var(--border);color:var(--green);font-weight:600">7.3%</td><td>39d</td>
+      </tr>
+      <tr>
+        <td><span class="tag" style="background:rgba(139,143,163,0.15);color:var(--muted)">disengaged</span></td>
+        <td><strong>426</strong> <span style="font-size:10px;color:var(--muted)">23%</span><div style="background:var(--border);border-radius:3px;height:5px;margin-top:2px"><div style="background:#8b8fa3;height:100%;border-radius:3px;width:50%"></div></div></td><td>48%</td><td>$41.8</td>
+        <td>0.0<br><span style="font-size:10px;color:var(--green)">→ 0.31 (∞)</span></td>
+        <td>0.0<br><span style="font-size:10px;color:var(--green)">→ 5.4 (∞)</span></td>
+        <td style="color:var(--red)">-0.28</td>
+        <td style="border-left:2px solid var(--border);font-size:10px;line-height:1.4">Mo: 33% at 8-14d<br>Yr: 45% at 181-365d</td>
+        <td style="border-left:2px solid var(--border);color:var(--red)">0.1%</td><td>27d</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-yellow">same_day</span></td>
+        <td><strong>235</strong> <span style="font-size:10px;color:var(--muted)">13%</span><div style="background:var(--border);border-radius:3px;height:5px;margin-top:2px"><div style="background:#f97316;height:100%;border-radius:3px;width:28%"></div></div></td><td>55%</td><td>$38.8</td>
+        <td>0.51<br><span style="font-size:10px;color:var(--green);font-weight:700">→ 1.86 (+265%)</span></td>
+        <td>12.4<br><span style="font-size:10px;color:var(--green);font-weight:700">→ 56.3 (+354%)</span></td>
+        <td style="color:var(--muted)">-0.08</td>
+        <td style="border-left:2px solid var(--border);font-size:10px;line-height:1.4">100% day 0<br><span style="color:var(--muted)">(by definition)</span></td>
+        <td style="border-left:2px solid var(--border)">1.2%</td><td>26d</td>
+      </tr>
+      <tr>
+        <td><span class="tag" style="background:rgba(139,143,163,0.15);color:var(--muted)">other</span></td>
+        <td><strong>183</strong> <span style="font-size:10px;color:var(--muted)">10%</span><div style="background:var(--border);border-radius:3px;height:5px;margin-top:2px"><div style="background:#6b7280;height:100%;border-radius:3px;width:21%"></div></div></td><td>56%</td><td>$36.9</td>
+        <td>1.95<br><span style="font-size:10px;color:var(--red)">→ 1.22 (-37%)</span></td>
+        <td>34.0<br><span style="font-size:10px;color:var(--red)">→ 22.3 (-34%)</span></td>
+        <td style="color:var(--green)">+0.83</td>
+        <td style="border-left:2px solid var(--border);font-size:10px;line-height:1.4">Mo: 32% at 8-14d<br>Yr: 31% at 181-365d</td>
+        <td style="border-left:2px solid var(--border)">0.2%</td><td>35d</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-yellow">engaged</span></td>
+        <td><strong>133</strong> <span style="font-size:10px;color:var(--muted)">7%</span><div style="background:var(--border);border-radius:3px;height:5px;margin-top:2px"><div style="background:#eab308;height:100%;border-radius:3px;width:16%"></div></div></td><td>56%</td><td>$37.6</td>
+        <td>2.08<br><span style="font-size:10px;color:var(--green)">→ 2.48 (+19%)</span></td>
+        <td class="good">61.5<br><span style="font-size:10px;color:var(--green)">→ 67.9 (+10%)</span></td>
+        <td style="color:var(--green)">+0.23</td>
+        <td style="border-left:2px solid var(--border);font-size:10px;line-height:1.4">Mo: 29% at 1-3d<br>Yr: 22% at 181-365d</td>
+        <td style="border-left:2px solid var(--border)">0.5%</td><td>23d</td>
+      </tr>
+      <tr>
+        <td><span class="tag" style="background:rgba(168,85,247,0.15);color:var(--purple)">declining</span></td>
+        <td>20 <span style="font-size:10px;color:var(--muted)">1%</span><div style="background:var(--border);border-radius:3px;height:5px;margin-top:2px"><div style="background:#a855f7;height:100%;border-radius:3px;width:2%"></div></div></td><td>63%</td><td>$34.2</td>
+        <td>1.74<br><span style="font-size:10px;color:var(--muted)">→ 1.63 (-6%)</span></td>
+        <td>29.8<br><span style="font-size:10px;color:var(--muted)">→ 28.6 (-4%)</span></td>
+        <td style="color:var(--red);font-weight:600">-2.66</td>
+        <td style="border-left:2px solid var(--border);font-size:10px;line-height:1.4;color:var(--muted)">Mo: spread 1-30d<br>Yr: spread 8-365d</td>
+        <td style="border-left:2px solid var(--border);color:var(--red)">0.0%</td><td>—</td>
+      </tr>
+      <tr>
+        <td><span class="tag" style="background:rgba(168,85,247,0.15);color:var(--purple)">early_basic</span></td>
+        <td>1 <span style="font-size:10px;color:var(--muted)">&lt;1%</span><div style="background:var(--border);border-radius:3px;height:5px;margin-top:2px"><div style="background:#d946ef;height:100%;border-radius:3px;width:1%"></div></div></td><td>84%</td><td>$23.1</td>
+        <td>1.06<br><span style="font-size:10px;color:var(--muted)">→ 1.03 (-3%)</span></td>
+        <td>24.2<br><span style="font-size:10px;color:var(--muted)">→ 19.1 (-21%)</span></td>
+        <td style="color:var(--muted)">-0.20</td>
+        <td style="border-left:2px solid var(--border);font-size:10px;line-height:1.4;color:var(--muted)">Mo: 1-7d only<br>Yr: 1-7d only</td>
+        <td style="border-left:2px solid var(--border);color:var(--red)">0.0%</td><td>—</td>
+      </tr>
+      <tr style="font-weight:700;border-top:2px solid var(--accent)">
+        <td colspan="2">TOTAL: 1,805/day</td>
+        <td colspan="6">
+          Revenue per save (conservative): <strong>Mo = 1 additional month × price (~$14.5)</strong> · <strong>Yr = 1 renewal × price (~$62)</strong><br>
+          <span style="font-weight:400;font-size:10px;color:var(--muted)">At 10% save → ~$2.2M/yr conservative · See Section 2.3 for net after cannibalization</span>
+        </td>
+        <td style="border-left:2px solid var(--border)" colspan="2">Baseline: 4.5% blended</td>
+      </tr>
+    </table>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px;padding:8px 10px;background:rgba(255,149,0,0.08);border-radius:6px;border:1px solid rgba(255,149,0,0.2)">
+      <strong style="color:var(--yellow)">⚠ Revenue estimate caveats:</strong><br>
+      <strong>1. Per-event, not per-user.</strong> 45% are repeat cancellers (median gap 68d). If we save 85 repeat monthly users today, they cancel again in ~68 days — we "save" them again. Annual save counts are inflated by repeat events on same users.<br>
+      <strong>2. Monthly: 1 save ≈ 1 extra month, not 3.</strong> Cancel = disable auto-renewal. Saving re-enables it for next billing cycle. Most repeat cancellers re-cancel within 1-2 months.<br>
+      <strong>3. Yearly: 1 save ≈ 1 renewal, but timing matters.</strong> A yearly user canceling on day 30 of their year — renewal is 335 days away. They can re-cancel any time before that. Revenue is only realized at renewal.<br>
+      <strong>Conservative estimate:</strong> 1 additional payment per save event × 10% save rate × 1,805/day × 365 = ~$2.2M/yr gross. Net after cannibalization and repeat inflation likely lower — Section 2.3 model is best reference.
+    </div>
+    <p style="font-size:10px;color:var(--muted);margin-top:4px"><strong>Before → After</strong> = play in 7d before cancel day vs 7d after (still Active Subscriber, not expired). <strong>Trend</strong> = play_days d-7→d-1 minus d-14→d-8 (engagement direction before cancel). <strong>Return 90d</strong> = natural resubscription rate without intervention. "/day" = Mar 9-25 avg (post-dedup).</p>
+  </div>
+</div>
+
+<div class="takeaway danger" style="margin-bottom:8px">
+  <strong>Same-day cancellers play 265% MORE after canceling.</strong> 77% are trial converts (67% with 1-7d tenure — they just converted and immediately canceled). Before cancel: 0.5 play days/7d. After cancel: 1.9 play days/7d, 56 games/7d. They cancel to remove auto-renewal pressure, then use the remaining paid period freely. <strong>This is cancellation-as-insurance, not churn.</strong>
+</div>
+<div class="takeaway danger" style="margin-bottom:8px">
+  <strong>Repeat cancellers (45% of daily, ≥2 lifetime cancels) also play MORE after canceling (+11%).</strong> 25→28 games/7d. They love the product — they manage their subscription. Discounting won't fix this; commitment offers might.
+</div>
+<div class="takeaway warn" style="margin-bottom:8px">
+  <strong>Engaged cancellers (7%) increase play +19% after canceling</strong> — 66→68 games/7d. Best loss-aversion targets. Small volume but highest expected save rate.
+</div>
+<div class="takeaway" style="margin-bottom:8px">
+  <strong>"Other" is the only segment that truly disengages after canceling (-37%).</strong> Disengaged segment slightly reactivates (+0.3 play days) — some discover content post-cancel.
+</div>
+
+<h3>Natural Return Rate by Segment × Tenure</h3>
+<p style="font-size:11px;color:var(--muted);margin-bottom:8px">% who resubscribe within 90 days of cancellation, by how far into their subscription they cancelled. Dec 2025–Feb 2026 cohort. Cells with &lt;20 cancellations excluded.</p>
+<div class="chart-grid">
+  <div class="chart-card full">
+    <table id="tbl_return_by_tenure">
+      <tr>
+        <th rowspan="2">Segment</th>
+        <th colspan="3" style="text-align:center;border-bottom:2px solid #6366f1;color:#6366f1">Monthly</th>
+        <th colspan="6" style="text-align:center;border-bottom:2px solid #22c55e;color:#22c55e">Yearly</th>
+      </tr>
+      <tr>
+        <th style="font-size:9px">Day 0</th><th style="font-size:9px">1-7d</th><th style="font-size:9px">8-30d</th>
+        <th style="font-size:9px">Day 0</th><th style="font-size:9px">1-7d</th><th style="font-size:9px">8-30d</th><th style="font-size:9px">31-90d</th><th style="font-size:9px">91-180d</th><th style="font-size:9px">181-365d</th>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">repeat</span></td>
+        <td style="font-weight:700;color:var(--green)">28.5%</td><td>6.1%</td><td>8.0%</td>
+        <td style="font-weight:700;color:var(--green)">18.3%</td><td>0.9%</td><td>0.3%</td><td>0.1%</td><td>0.0%</td><td style="color:var(--green)">4.1%</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-yellow">same_day</span></td>
+        <td style="font-weight:700;color:var(--green)">22.2%</td><td style="color:var(--muted)">—</td><td style="color:var(--muted)">—</td>
+        <td style="font-weight:700;color:var(--green)">15.1%</td><td style="color:var(--muted)">—</td><td style="color:var(--muted)">—</td><td style="color:var(--muted)">—</td><td style="color:var(--muted)">—</td><td style="color:var(--muted)">—</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-yellow">engaged</span></td>
+        <td style="color:var(--muted)">—</td><td>1.1%</td><td>2.8%</td>
+        <td style="color:var(--muted)">—</td><td>0.8%</td><td>0.6%</td><td>0.0%</td><td>0.0%</td><td>0.1%</td>
+      </tr>
+      <tr>
+        <td><span class="tag" style="background:rgba(139,143,163,0.15);color:var(--muted)">other</span></td>
+        <td style="color:var(--muted)">—</td><td>0.5%</td><td>0.0%</td>
+        <td style="color:var(--muted)">—</td><td>0.7%</td><td>0.1%</td><td>0.0%</td><td>0.0%</td><td>0.1%</td>
+      </tr>
+      <tr>
+        <td><span class="tag" style="background:rgba(139,143,163,0.15);color:var(--muted)">disengaged</span></td>
+        <td style="color:var(--muted)">—</td><td>0.2%</td><td>0.0%</td>
+        <td style="color:var(--muted)">—</td><td>0.5%</td><td>0.1%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td>
+      </tr>
+      <tr>
+        <td><span class="tag" style="background:rgba(168,85,247,0.15);color:var(--purple)">declining</span></td>
+        <td style="color:var(--muted)">—</td><td>0.0%</td><td style="color:var(--muted)">n/a</td>
+        <td style="color:var(--muted)">—</td><td style="color:var(--muted)">n/a</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td>
+      </tr>
+    </table>
+    <p style="font-size:10px;color:var(--muted);margin-top:6px"><strong>Day 0</strong> = cancel same day as subscription start. <strong>"—"</strong> = not applicable (same_day only cancels day 0, engaged/disengaged/other don't cancel day 0). <strong>n/a</strong> = fewer than 20 users.</p>
+  </div>
+</div>
+<div class="takeaway success" style="margin:8px 0">
+  <strong>Same-day repeat monthly: 28.5% come back naturally.</strong> These are subscription managers — they cancel and resubscribe routinely. Same-day non-repeat: 22% (Mo) / 15% (Yr). Repeat yearly at 181-365d: 4.1% (annual renewal cycle). <strong>Everyone else is &lt;3%. Natural return is almost entirely a repeat + same-day phenomenon.</strong>
+</div>
+
+<h3>Save Rate Scenarios — Gross vs Net After Re-Cancellation</h3>
+<p style="font-size:11px;color:var(--muted);margin-bottom:8px">Not all saved users stay. Repeat cancellers re-cancel within ~68d. The gap between Gross and Net = revenue lost to re-cancellation.</p>
+<div class="chart-grid">
+  <div class="chart-card full" style="position:relative">
+    <canvas id="chart_save_scenarios"></canvas>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;color:var(--muted);text-align:right;line-height:1.5">
+      <span style="display:inline-block;width:12px;height:12px;background:rgba(99,102,241,0.25);border:2px dashed #6366f1;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Gross (if all saves stick)<br>
+      <span style="display:inline-block;width:12px;height:12px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Net (realistic)<br>
+      <span style="color:var(--red)">Red text</span> = re-cancel loss
+    </div>
+  </div>
+</div>
+<div class="takeaway success">
+  <strong>At 10% save rate → ~$2.2M/year (conservative).</strong> Industry benchmark: 10-20% for churn deflection flows.<br>
+  <strong>Revenue logic:</strong> 1 save = 1 additional billing cycle (Mo: 1 month, Yr: 1 renewal). Repeat cancellers (45%) will re-cancel — each save buys time, not permanent retention. See Section 2.3 for cannibalization model.
+</div>
+</div>
+
+<!-- ============ SECTION 2.3: Revenue Reality ============ -->
+<div class="slide" id="s7">
+<h2>2.3 Revenue Reality — Do They Come Back Organically?</h2>
+<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Historical cohort analysis: of users who canceled, what % returned naturally within 1, 2, 3, ... 12 months? Based on 90K+ canceled subs (Jan 2024 – Mar 2025, 20% sample, 12-month observation window).</p>
+
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>Cumulative Natural Return Rate — Monthly Plans</h3>
+    <canvas id="chart_return_curve_mo"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Cumulative Natural Return Rate — Yearly Plans</h3>
+    <canvas id="chart_return_curve_yr"></canvas>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card full">
+    <h3>Return Rate at Each Discount Window — This Is Your Cannibalization Rate</h3>
+    <table id="tbl_return_rates">
+      <tr><th>Stage</th><th>Plan</th><th>n</th><th>1mo</th><th>2mo</th><th>3mo</th><th>4mo</th><th>6mo</th><th>9mo</th><th>12mo</th></tr>
+      <tr><td>1st sub</td><td>monthly</td><td>44,909</td><td>3.4%</td><td>6.9%</td><td>8.7%</td><td>10.0%</td><td>12.0%</td><td>14.0%</td><td>15.3%</td></tr>
+      <tr><td>2nd sub</td><td>monthly</td><td>5,793</td><td>4.3%</td><td>9.6%</td><td>12.2%</td><td>14.0%</td><td>17.3%</td><td>20.4%</td><td>22.4%</td></tr>
+      <tr><td>3rd sub</td><td>monthly</td><td>1,307</td><td>5.6%</td><td>10.0%</td><td>13.3%</td><td>15.7%</td><td>19.6%</td><td>24.1%</td><td>26.9%</td></tr>
+      <tr><td>4-5th sub</td><td>monthly</td><td>468</td><td>6.2%</td><td>13.0%</td><td>16.0%</td><td>19.7%</td><td>24.6%</td><td>28.6%</td><td style="color:var(--red);font-weight:600">31.8%</td></tr>
+      <tr><td>6th+ sub</td><td>monthly</td><td>186</td><td style="color:var(--red);font-weight:600">11.3%</td><td style="color:var(--red);font-weight:600">23.1%</td><td style="color:var(--red);font-weight:600">29.0%</td><td style="color:var(--red);font-weight:600">34.4%</td><td style="color:var(--red);font-weight:600">38.7%</td><td style="color:var(--red);font-weight:600">43.0%</td><td style="color:var(--red);font-weight:600">43.5%</td></tr>
+      <tr style="border-top:1px solid var(--border)"><td>1st sub</td><td>yearly</td><td>28,701</td><td>1.0%</td><td>1.6%</td><td>2.3%</td><td>2.8%</td><td>4.1%</td><td>6.1%</td><td>8.6%</td></tr>
+      <tr><td>2nd sub</td><td>yearly</td><td>4,530</td><td>0.9%</td><td>1.8%</td><td>2.8%</td><td>3.7%</td><td>5.3%</td><td>8.5%</td><td>13.1%</td></tr>
+      <tr><td>3rd sub</td><td>yearly</td><td>1,052</td><td>1.5%</td><td>2.8%</td><td>4.2%</td><td>5.4%</td><td>8.5%</td><td>12.1%</td><td>18.1%</td></tr>
+      <tr><td>4-5th sub</td><td>yearly</td><td>350</td><td>1.1%</td><td>3.7%</td><td>4.3%</td><td>5.1%</td><td>7.1%</td><td>11.7%</td><td>18.6%</td></tr>
+      <tr><td>6th+ sub</td><td>yearly</td><td style="color:var(--yellow)">48 ⚠</td><td>4.2%</td><td>4.2%</td><td>4.2%</td><td>6.3%</td><td>6.3%</td><td>14.6%</td><td>18.8%</td></tr>
+    </table>
+    <p style="font-size:10px;color:var(--muted);margin-top:4px">Read as: "If you offer a 3-month discount to a repeat monthly canceller (6th+ sub), 29% of them would have come back anyway within 3 months — that 29% is your cannibalization rate."<br><span style="color:var(--yellow)">⚠ n &lt; 100:</span> 6th+ yearly (n=48) and 6th+ monthly (n=186) are directional only. Key decisions (repeat monthly 2nd-3rd sub, n=5,793-1,307) have solid sample sizes.</p>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card full" style="padding:16px">
+    <h3 style="margin-bottom:12px">Scenario Calculator: Net Revenue After Cannibalization</h3>
+    <div style="display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap;align-items:end">
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Discount window:</label><br>
+        <select id="sel_window" style="padding:4px 8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:13px">
+          <option value="0">1 month</option>
+          <option value="2" selected>3 months</option>
+          <option value="4">6 months</option>
+          <option value="6">12 months (yearly upsell)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Discount: <strong id="disc_label">20%</strong></label><br>
+        <input type="range" id="slider_disc" min="0" max="50" value="20" step="5" style="width:180px">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted)">Save rate: <strong id="save_label">10%</strong></label><br>
+        <input type="range" id="slider_save" min="5" max="25" value="10" step="5" style="width:180px">
+      </div>
+    </div>
+    <table>
+      <tr>
+        <th>Segment</th><th>Daily Vol</th><th>P(natural return)</th>
+        <th>Rev if Saved</th><th>Cannibalization</th><th>Net / Save</th>
+        <th>Yearly Net</th>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">repeat monthly</span></td>
+        <td>578</td><td id="sr_mo_ret"></td>
+        <td id="sr_mo_naive"></td><td id="sr_mo_cannibal" class="highlight"></td>
+        <td id="sr_mo_net" class="good"></td><td id="sr_mo_annual"></td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-red">repeat yearly</span></td>
+        <td>269</td><td id="sr_yr_ret"></td>
+        <td id="sr_yr_naive"></td><td id="sr_yr_cannibal" class="highlight"></td>
+        <td id="sr_yr_net" class="good"></td><td id="sr_yr_annual"></td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-yellow">non-repeat monthly</span></td>
+        <td>533</td><td id="ns_mo_ret"></td>
+        <td id="ns_mo_naive"></td><td id="ns_mo_cannibal"></td>
+        <td id="ns_mo_net" class="good"></td><td id="ns_mo_annual"></td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-yellow">non-repeat yearly</span></td>
+        <td>480</td><td id="ns_yr_ret"></td>
+        <td id="ns_yr_naive"></td><td id="ns_yr_cannibal"></td>
+        <td id="ns_yr_net" class="good"></td><td id="ns_yr_annual"></td>
+      </tr>
+      <tr style="font-weight:700;border-top:2px solid var(--accent)">
+        <td colspan="2">TOTAL (1,860/day)</td><td></td>
+        <td id="total_naive"></td><td id="total_cannibal" class="highlight"></td>
+        <td id="total_net"></td><td id="total_annual"></td>
+      </tr>
+    </table>
+    <p style="font-size:10px;color:var(--muted);margin-top:6px"><strong>Logic:</strong> Revenue if saved = window × price × (1-discount). Cannibalization = P(natural return within window) × window/2 × full price (avg returner comes back at midpoint). Net = saved revenue - cannibalized revenue.</p>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card full"><canvas id="chart_cannibal_compare"></canvas></div>
+</div>
+
+<div class="takeaway danger">
+  <strong>Repeat cancellers are the WORST discount target.</strong> 6th+ monthly: 29% return within 3 months naturally. Offering 3-month discounts cannibalizes ~29% of the value.<br>
+  <strong>Best discount targets: first-time yearly</strong> (480/day). Only 2.3% return within 3 months → 97.7% incremental.<br>
+  <strong>Strategy:</strong><br>
+  &nbsp;&nbsp;• Repeat (819/day, 2+ cancels) → Don't discount. Ask "What would keep you?" + yearly commitment offer.<br>
+  &nbsp;&nbsp;• First-time yearly (480/day) → Discount aggressively (3-6mo). Lowest cannibalization, highest price/save.<br>
+  &nbsp;&nbsp;• First-time monthly (533/day) → Short discount (1-3mo) or upsell to yearly.
+</div>
+</div>
+
+<!-- ============ SECTION 2.4: The Repeat Problem ============ -->
+<div class="slide" id="s6">
+<h2>2.4 The Repeat Problem — Resolved ✓</h2>
+
+<div class="takeaway success" style="margin-bottom:12px;font-size:13px">
+  <strong>✓ RESOLVED: <code>subscription_dedup_mapping</code> model deployed (Mar 26).</strong><br>
+  Apple/Google create a new <code>subscription_id</code> when products are renamed. This inflated <code>prior_sub_count</code> and <code>cancel_count_snapshot</code>. The dedup model detects 31K phantom artifacts via timestamp overlap and COALESCES them to canonical subscription_ids.<br>
+  <strong style="color:var(--text)">Impact:</strong> 2,706 users reclassified in subscriber_history (phantom-only priors → first_time). 1,295 users dropped from serial_canceller (phantom cancels removed). <code>has_phantom_artifact</code> flag added for monitoring (3,743 active users, 0.6%).
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card full">
+    <h3>Evidence: Tenure vs Cancel Count Doesn’t Add Up</h3>
+    <table>
+      <tr><th>Tenure at Cancel</th><th>Cancels (17d)</th><th>Avg Cancel Count</th><th>Verdict</th></tr>
+      <tr><td style="color:var(--red);font-weight:600">0-1 month</td><td><strong>4,323</strong></td><td style="color:var(--red);font-weight:600">3.3</td><td style="color:var(--red)">Impossible — &lt;30d tenure, 3+ cancels</td></tr>
+      <tr><td style="color:var(--red);font-weight:600">1-3 months</td><td>2,487</td><td style="color:var(--red);font-weight:600">3.3</td><td style="color:var(--red)">Suspicious — 3+ cancels in &lt;90d</td></tr>
+      <tr><td>3-7 months</td><td>2,227</td><td>3.9</td><td style="color:var(--yellow)">Plausible for monthly cyclers</td></tr>
+      <tr><td>7-12 months</td><td>2,048</td><td>4.3</td><td style="color:var(--green)">Consistent</td></tr>
+      <tr><td>12+ months</td><td>3,329</td><td>5.3</td><td style="color:var(--green)">Consistent</td></tr>
+    </table>
+    <div class=”takeaway success” style=”margin-top:8px”>
+      <strong>Fixed:</strong> <code>subscription_dedup_mapping</code> now excludes phantom product cancellations from <code>cancel_count_snapshot</code>. The 0-1 month / 3.3 avg cancels artifact is corrected — phantom cancels from Apple product renames no longer inflate the count.
+    </div>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card full">
+    <h3>Root Cause: Overlapping Subscription IDs</h3>
+    <table>
+      <tr><th>Transition</th><th>Platform</th><th>Count</th><th>Avg Overlap</th></tr>
+      <tr><td>mo → mo (same plan)</td><td>Apple</td><td>21,497</td><td style="color:var(--red)">-243 days</td></tr>
+      <tr><td>mo → yr (upgrade)</td><td>Apple</td><td>12,924</td><td>-176 days</td></tr>
+      <tr><td>yr → yr (same plan)</td><td>Apple</td><td>5,178</td><td>-210 days</td></tr>
+      <tr><td>yr → mo (downgrade)</td><td>Apple</td><td>4,720</td><td>-267 days</td></tr>
+    </table>
+    <div class=”takeaway success” style=”margin-top:8px”>
+      <strong>Resolved:</strong> <code>subscription_dedup_mapping</code> detects these overlaps via timestamp comparison (<code>sub_b.subscription_at &lt; sub_a.expiration_at</code> + different product_id). 31K phantom artifacts mapped to canonical subscription_ids. Integrated into <code>cancellation_daily_segments</code> via COALESCE join.<br>
+      <strong style=”color:var(--text)”>Remaining:</strong> 8.4K same-product overlaps flagged separately to DE (billing pipeline issue, not product renames).
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:12px">Subscription Journeys — How They Cycle</h3>
+<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Despite the data quality issue above, the cycling pattern is real. Repeat = 2-3 lifetime cancels. Serial = 4+.</p>
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>Top Subscription Journeys (Serial: 4+ cancels)</h3>
+    <table>
+      <tr><th>Journey (first 4 subs)</th><th>Users</th><th>Avg Total Subs</th></tr>
+      <tr><td><code style="color:var(--red)">Md → Md → Md → Md</code></td><td><strong>4,407</strong></td><td>6.2</td></tr>
+      <tr><td><code>Mt → Md → Md → Md</code></td><td><strong>2,553</strong></td><td>5.4</td></tr>
+      <tr><td><code>Mt → Mt → Md → Md</code></td><td>844</td><td>4.5</td></tr>
+      <tr><td><code>Mt → Mt → Mt → Mt</code></td><td>607</td><td>4.7</td></tr>
+      <tr><td><code>Mt → Mt → Mt → Md</code></td><td>578</td><td>4.4</td></tr>
+      <tr><td><code style="color:var(--yellow)">Mt → Mt → Mt → Yt</code></td><td>483</td><td>4.3</td></tr>
+    </table>
+    <p style="font-size:10px;color:var(--muted);margin-top:4px">M=monthly Y=yearly t=trial d=direct.</p>
+  </div>
+  <div class="chart-card">
+    <h3>Gap Between Subscriptions</h3>
+    <canvas id="chart_serial_gaps"></canvas>
+  </div>
+</div>
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>Plan Transitions — Where Do They Come From?</h3>
+    <table>
+      <tr><th>Current</th><th>Previous</th><th>Freq</th><th>Subs</th><th>Avg Gap</th><th>Median Gap</th></tr>
+      <tr><td>monthly</td><td><em>first sub</em></td><td>repeat</td><td>779K</td><td>223d</td><td>116d</td></tr>
+      <tr><td>monthly</td><td><em>first sub</em></td><td>serial</td><td>191K</td><td>134d</td><td>71d</td></tr>
+      <tr><td>monthly</td><td>monthly</td><td>serial</td><td>159K</td><td>143d</td><td style="color:var(--yellow);font-weight:600">68d</td></tr>
+      <tr><td>monthly</td><td>monthly</td><td>repeat</td><td>108K</td><td>188d</td><td>103d</td></tr>
+      <tr><td>yearly</td><td><em>first sub</em></td><td>repeat</td><td>320K</td><td>273d</td><td>255d</td></tr>
+      <tr><td>yearly</td><td>monthly</td><td>serial</td><td>52K</td><td>263d</td><td>284d</td></tr>
+    </table>
+  </div>
+  <div class="chart-card">
+    <h3>Key Patterns</h3>
+    <div class="takeaway danger" style="margin-bottom:8px">
+      <strong>#1: Monthly direct loop</strong> (Md→Md→Md→Md) = 4,407 users with avg 6.2 subs. Subscribe, cancel, return in ~68 days. They WILL come back.
+    </div>
+    <div class="takeaway warn" style="margin-bottom:8px">
+      <strong>Trial → monthly pipeline:</strong> Most repeat journeys start with trial (Mt), then monthly direct (Md) loop. Trial is the entry, monthly is the trap.
+    </div>
+    <div class="takeaway success">
+      <strong>Serial (4+) cancellers return faster:</strong> 9.5% overlap (resub before expiry) vs 4.4% for repeat (2-3). 22.8% return within 31-90d.
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============ SECTION 2.5: Recommendations ============ -->
+<div class="slide" id="s8">
+<h2>2.5 What To Do Next</h2>
+<div class="chart-grid">
+  <div class="chart-card full" style="padding:16px">
+    <table>
+      <tr><th style="width:30px">#</th><th>Action</th><th>Target</th><th>Expected Impact</th><th>Effort</th><th>Ready?</th></tr>
+      <tr style="background:rgba(99,102,241,0.08)">
+        <td style="font-weight:700;color:var(--accent)">0</td>
+        <td><strong>Build churn deflection flow — all segments</strong><br>
+        <span style="color:var(--muted);font-size:11px">One cancel flow with branching messages per intervention_segment. Reason survey as first step for everyone. This is the platform — actions below are the messages within it.</span></td>
+        <td>1,805/day</td>
+        <td style="color:var(--green);font-weight:600">~$2.2M/yr at 10% save (conservative)</td>
+        <td><span class="tag tag-yellow">Medium</span></td>
+        <td><span class="tag tag-red">Eng</span><br><span style="font-size:10px;color:var(--muted)">Cancel flow UI needed</span></td>
+      </tr>
+      <tr><td colspan="6" style="font-size:10px;color:var(--accent);font-weight:600;padding:8px 8px 4px;border:none">MESSAGES WITHIN THE FLOW — prioritized by expected net revenue</td></tr>
+      <tr>
+        <td style="font-weight:700;color:var(--red)">1</td>
+        <td><strong>Repeat (2+ cancels): DON'T discount, ask why + yearly upsell</strong><br>
+        <span style="color:var(--muted);font-size:11px">46% of daily cancels. 29% of monthly return naturally in 3mo — discounting cannibalizes. They play 32 games/wk. Survey → "what would keep you?" → yearly commitment offer for monthly cyclers (578/day mo, Md→Md→Md loop).</span></td>
+        <td><span class="tag tag-red">repeat</span><br>819/day</td>
+        <td style="color:var(--green);font-weight:600">$0.8M/yr (upsell 10%)</td>
+        <td><span class="tag tag-green">Low</span></td>
+        <td><span class="tag tag-green">Now</span><br><span style="font-size:10px;color:var(--muted)">Survey + upsell copy</span></td>
+      </tr>
+      <tr>
+        <td style="font-weight:700;color:var(--red)">2</td>
+        <td><strong>Disengaged: new content alert + expiry reminder</strong><br>
+        <span style="color:var(--muted);font-size:11px">0 play days last week, 0.1% return naturally. Low save rate expected — but 52% are yearly ($42 avg price), so even 5% save is meaningful. Don't waste discounts here.</span></td>
+        <td><span class="tag" style="background:rgba(139,143,163,0.15);color:var(--muted)">disengaged</span><br>425/day</td>
+        <td style="color:var(--yellow)">$0.3M/yr at 5% save</td>
+        <td><span class="tag tag-green">Low</span></td>
+        <td><span class="tag tag-green">Now</span><br><span style="font-size:10px;color:var(--muted)">Content messaging</span></td>
+      </tr>
+      <tr>
+        <td style="font-weight:700;color:var(--orange)">3</td>
+        <td><strong>Same-day: value preview ("You haven't explored everything")</strong><br>
+        <span style="color:var(--muted);font-size:11px">Cancel on invoice day 0. 77% are trial converts (cancel immediately after conversion). They play 265% MORE after cancel — removing auto-renewal pressure. 1.2% natural return. Show what they'll miss. Don't discount (they just subscribed).</span></td>
+        <td><span class="tag tag-yellow">same_day</span><br>240/day</td>
+        <td style="color:var(--green);font-weight:600">$0.5M/yr at 10% save</td>
+        <td><span class="tag tag-green">Low</span></td>
+        <td><span class="tag tag-yellow">Partial</span><br><span style="font-size:10px;color:var(--muted)">Needs content API</span></td>
+      </tr>
+      <tr>
+        <td style="font-weight:700;color:var(--orange)">4</td>
+        <td><strong>Engaged: loss aversion ("You played 65 games this week!")</strong><br>
+        <span style="color:var(--muted);font-size:11px">Playing on cancel day! 2.3 play days/wk, 65 games/7d. Highest engagement of any segment. Show usage stats + discount for yearly. Best expected save rate.</span></td>
+        <td><span class="tag tag-yellow">engaged</span><br>141/day</td>
+        <td style="color:var(--green);font-weight:600">$0.5M/yr at 20% save</td>
+        <td><span class="tag tag-green">Low</span></td>
+        <td><span class="tag tag-yellow">Partial</span><br><span style="font-size:10px;color:var(--muted)">Data ready, needs flow</span></td>
+      </tr>
+      <tr>
+        <td style="font-weight:700;color:var(--blue)">5</td>
+        <td><strong>Other (179/day): generic reason survey</strong><br>
+        <span style="color:var(--muted);font-size:11px">Active in past 7d but not playing today, no declining trend. Moderate engagement. Survey to learn more, discount if yearly first-timer.</span></td>
+        <td><span class="tag" style="background:rgba(139,143,163,0.15);color:var(--muted)">other</span><br>179/day</td>
+        <td style="color:var(--yellow)">Data collection</td>
+        <td><span class="tag tag-green">Low</span></td>
+        <td><span class="tag tag-green">Now</span><br><span style="font-size:10px;color:var(--muted)">Survey copy</span></td>
+      </tr>
+      <tr style="border-top:2px solid var(--border)">
+        <td colspan="6" style="font-size:10px;color:var(--accent);font-weight:600;padding:8px 8px 4px;border:none">SUPPORTING ACTIONS</td>
+      </tr>
+      <tr>
+        <td style="font-weight:700;color:var(--blue)">6</td>
+        <td><strong>Tailored onboarding for basic upgrades</strong><br>
+        <span style="color:var(--muted);font-size:11px">46.8% pool cancel rate, 42% within first week. Upstream fix — prevent cancellation before it happens.</span></td>
+        <td>49K basic upgrades</td>
+        <td style="color:var(--yellow)">Reduce early cancel</td>
+        <td><span class="tag tag-red">High</span></td>
+        <td><span class="tag tag-red">Eng</span><br><span style="font-size:10px;color:var(--muted)">Onboarding flow</span></td>
+      </tr>
+      <tr>
+        <td style="font-weight:700;color:var(--blue)">7</td>
+        <td><strong><s>Fix billing overlap artifacts</s> ✓ Done</strong><br>
+        <span style="color:var(--muted);font-size:11px"><code>subscription_dedup_mapping</code> deployed Mar 26. 31K phantoms mapped, 1,295 serial→lower bucket, 2,706 returning→first_time.</span></td>
+        <td>Data quality</td>
+        <td style="color:var(--green)">Shipped</td>
+        <td><span class="tag tag-green">Done</span></td>
+        <td><span class="tag tag-green">Done</span><br><span style="font-size:10px;color:var(--muted)">dbt model</span></td>
+      </tr>
+    </table>
+  </div>
+</div>
+<div class="takeaway success" style="font-size:13px;line-height:1.8">
+  <strong>Bottom line:</strong> One deflection flow, branching messages per segment. Survey for everyone. ~$2.2M/year at 10% save rate (conservative: 1 save = 1 billing cycle, repeat cancellers will re-cancel).<br>
+  <strong>Key insight for repeat cancellers (819/day, 45%):</strong> ACTIVE players (31 games/7d) managing their subscription. DON'T discount — they return naturally (29% in 3mo). Survey + yearly commitment instead.<br>
+  <strong>Key insight from behavioral gap:</strong> Monthly cancelers ≈ non-cancelers (subscription management). Yearly cancelers play 43% less (real disengagement). Different problems, different messages.
+</div>
+</div>
+
+<!-- Transition banner: Problem B -->
+<div style="text-align:center;padding:16px 0;margin:4px 0">
+  <div style="display:inline-block;background:var(--card);border:2px solid var(--yellow);border-radius:8px;padding:8px 24px;font-size:14px;font-weight:600;color:var(--yellow);letter-spacing:1px">
+    PROBLEM B: WIN-BACK — CANCELED USERS STILL PLAYING
+  </div>
+</div>
+
+<!-- ============ SECTION 3.1: Win-Back (Problem B — future workstream) ============ -->
+<div class="slide" id="s9">
+<h2>3.1 Win-Back Opportunity — 16.4K Canceled Users Still Playing</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:8px">
+  <div class="kpi"><div class="label">Playing Daily</div><div class="value" style="color:var(--yellow)">16.4K</div><div class="detail">9.9% of 165K canceled pool</div></div>
+  <div class="kpi"><div class="label">Mostly Yearly</div><div class="value">80%</div><div class="detail">12.6K yearly · 3.1K monthly</div></div>
+  <div class="kpi"><div class="label">Play Gap</div><div class="value">5.2pp</div><div class="detail">14.8% active vs 9.6% canceled</div></div>
+  <div class="kpi"><div class="label">Engagement</div><div class="value">85</div><div class="detail">games/7d · 2.9 play days/wk</div></div>
+</div>
+<div class="takeaway warn">
+  <strong>These users love the product — they just don't pay.</strong> Monthly canceled play at 15.3% (nearly same as active subscribers). Best win-back targets.<br>
+  <strong>Separate workstream from churn deflection.</strong> Requires re-subscription offers, in-app messaging, and CRM campaigns — different team, different timeline.
+</div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+Chart.defaults.color = '#CBC2FF';
+Chart.defaults.borderColor = '#3d2d6e';
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+Chart.defaults.font.size = 11;
+const lineLegend = { labels: { usePointStyle: true, pointStyle: 'line' } };
+
+// === CHART 1: Pool Trend (bars + canceled % line) ===
+const dailyData = [
+  ["2025-09-17",549532,151012,12406,1616],["2025-10-01",548399,151773,13226,1710],["2025-10-15",550407,152655,13650,1640],
+  ["2025-11-01",558884,155253,17278,1545],["2025-11-15",565604,158192,23974,1686],["2025-12-01",571961,159504,14235,1882],
+  ["2025-12-15",576126,161334,17163,1611],["2026-01-01",581176,162898,19732,1928],["2026-01-15",583133,166865,13992,1836],
+  ["2026-02-01",586807,166562,19085,1917],["2026-02-15",592312,166233,21699,1829],["2026-03-01",597382,164283,21247,2184],
+  ["2026-03-16",602977,164720,16614,1767]
+];
+new Chart(document.getElementById('chart_daily_trend'), {
+  type: 'bar',
+  data: {
+    labels: dailyData.map(d => d[0]),
+    datasets: [
+      {label:'Subscribers (K)',data:dailyData.map(d=>d[1]/1000),backgroundColor:'rgba(59,130,246,0.6)',borderColor:'#3b82f6',borderWidth:1,yAxisID:'y',order:2},
+      {label:'Active Canceled (K)',data:dailyData.map(d=>d[2]/1000),backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1,yAxisID:'y',order:2},
+      {label:'Canceled % of Base',data:dailyData.map(d=>Math.round(d[2]/d[1]*1000)/10),type:'line',borderColor:'#eab308',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointRadius:3,pointBackgroundColor:'#eab308',order:1}
+    ]
+  },
+  options:{
+    plugins:{
+      title:{display:true,text:'Subscriber Base vs Canceled Pool',font:{size:13}},
+      subtitle:{display:true,text:'Canceled % stable at 27-29% since Sep — base and pool grow together',font:{size:10},color:'#8b8fa3'},
+      legend:{labels:{usePointStyle:true}},
+      tooltip:{callbacks:{label:function(ctx){
+        if(ctx.dataset.yAxisID==='y1') return ctx.dataset.label+': '+ctx.parsed.y+'%';
+        return ctx.dataset.label+': '+Math.round(ctx.parsed.y)+'K';
+      }}}
+    },
+    scales:{
+      y:{position:'left',beginAtZero:true,title:{display:true,text:'Users (K)'}},
+      y1:{position:'right',title:{display:true,text:'Canceled %'},grid:{drawOnChartArea:false},min:20,max:32}
+    }
+  }
+});
+
+// === CHART 1a2: Daily Cancel Rate by Segment (horizontal bar) ===
+new Chart(document.getElementById('chart_daily_rate_segments'), {
+  type: 'bar',
+  data: {
+    labels: ['Monthly','basic_upgrade','Direct','Returning','Apple','Google','First-time','Trial','Yearly'],
+    datasets: [{
+      label: 'Daily Cancel Rate (%)',
+      data: [0.56, 0.45, 0.39, 0.36, 0.31, 0.28, 0.26, 0.25, 0.18],
+      backgroundColor: ['#ef4444','#d946ef','#a855f7','#f97316','#3b82f6','#22c55e','#6366f1','#8b8fa3','#3b82f6'],
+      borderWidth: 0,
+      borderRadius: 3
+    }]
+  },
+  options:{
+    indexAxis: 'y',
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      title:{display:true,text:'Daily Cancel Rate — % of Segment Base That Cancels Per Day',font:{size:13}},
+      subtitle:{display:true,text:'Monthly churns 3× faster than yearly. basic_upgrade 1.7× faster than first-time. Trial < Direct (trials lock in).',font:{size:10},color:'#8b8fa3'},
+      legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>ctx.parsed.x+'% of segment cancels per day'}}
+    },
+    scales:{x:{beginAtZero:true,max:0.7,title:{display:true,text:'% of segment base canceling per day'},ticks:{callback:v=>v+'%'}}}
+  }
+});
+
+// === CHART 1b: Early Cancel Rate (bars + line, cut first 30d) ===
+const flowDataFull = [
+["2025-12-15",654,7056,1611],["2025-12-16",632,6897,1560],["2025-12-17",630,6490,1419],["2025-12-18",682,6593,1484],
+["2025-12-19",742,6959,1488],["2025-12-20",1064,7603,1602],["2025-12-21",1020,7391,1591],["2025-12-22",753,7062,1645],
+["2025-12-23",802,6958,1537],["2025-12-24",777,6864,1424],["2025-12-25",808,6741,1410],["2025-12-26",837,7021,1800],
+["2025-12-27",990,7570,1818],["2025-12-28",999,7793,1880],["2025-12-29",847,6906,2038],["2025-12-30",884,6969,1894],
+["2025-12-31",960,5545,1737],["2026-01-01",1125,7502,1928],["2026-01-02",930,7377,2223],["2026-01-03",1072,7390,2134],
+["2026-01-04",1055,7269,2216],["2026-01-05",715,7135,2210],["2026-01-06",695,6885,2019],["2026-01-07",619,6905,1807],
+["2026-01-08",686,7267,1796],["2026-01-09",829,7172,1813],["2026-01-10",1085,7215,1930],["2026-01-11",1106,7342,2073],
+["2026-01-12",684,6865,1981],["2026-01-13",665,6871,1761],["2026-01-14",648,6784,1845],["2026-01-15",727,6787,1836],
+["2026-01-16",814,7186,1762],["2026-01-17",1160,7519,1814],["2026-01-18",1116,7768,1799],["2026-01-19",780,6921,1950],
+["2026-01-20",676,6776,1791],["2026-01-21",718,6823,1785],["2026-01-22",745,6859,1765],["2026-01-23",926,7273,1737],
+["2026-01-24",1249,7961,1969],["2026-01-25",1190,7890,2075],["2026-01-26",892,7362,1975],["2026-01-27",787,7099,1877],
+["2026-01-28",727,7361,1771],["2026-01-29",771,6703,1744],["2026-01-30",846,7296,1832],["2026-01-31",1208,6797,1975],
+["2026-02-01",1150,8072,1917],["2026-02-02",764,7432,1938],["2026-02-03",704,6998,1803],["2026-02-04",692,6977,1875],
+["2026-02-05",761,7060,1772],["2026-02-06",854,7138,1731],["2026-02-07",1222,8038,1823],["2026-02-08",1146,7958,1801],
+["2026-02-09",839,7300,1709],["2026-02-10",819,6839,1726],["2026-02-11",806,7007,1744],["2026-02-12",797,6862,1650],
+["2026-02-13",923,7443,1538],["2026-02-14",1293,8156,1656],["2026-02-15",1253,8211,1829],["2026-02-16",981,7693,1820],
+["2026-02-17",920,7186,1804],["2026-02-18",910,7467,1753],["2026-02-19",919,7157,1722],["2026-02-20",987,7455,1824],
+["2026-02-21",1386,8077,1910],["2026-02-22",1185,8012,1964],["2026-02-23",874,7741,1915],["2026-02-24",806,7457,1824],
+["2026-02-25",873,7657,1796],["2026-02-26",1006,7642,1803],["2026-02-27",1097,8072,1857],["2026-02-28",1512,17977,2077],
+["2026-03-01",1405,12619,2184],["2026-03-02",905,7876,2118],["2026-03-03",879,7382,1967],["2026-03-04",886,7360,1905],
+["2026-03-05",864,7460,1867],["2026-03-06",948,7538,1719],["2026-03-07",1283,8544,1809],["2026-03-08",1227,8787,1864],
+["2026-03-09",816,7434,1812],["2026-03-10",947,7010,1769],["2026-03-11",956,7356,1776],["2026-03-12",952,7147,1751],
+["2026-03-13",1124,7693,1878],["2026-03-14",1503,8679,1901],["2026-03-15",1346,8223,1830],["2026-03-16",799,6350,1767]
+];
+// Cut first 30 days (incomplete rolling window)
+const flowData = flowDataFull.slice(30);
+function rollingSum(arr, idx, window) {
+  const start = Math.max(0, idx - window + 1);
+  return arr.slice(start, idx + 1).reduce((a, b) => a + b, 0);
+}
+const allRawNewSubs = flowDataFull.map(x => x[1]);
+const flowLabels = flowData.map(d => d[0]);
+const rawCancels = flowData.map(x => x[3]);
+// 30d sum uses the full dataset for lookback
+const r30Pool = flowData.map((d, i) => {
+  const fullIdx = i + 30; // offset back to full array index
+  return rollingSum(allRawNewSubs, fullIdx, 30);
+});
+// Daily early cancel rate = today's cancels / 30d new sub pool × 100
+const earlyCancelRate = flowData.map((d, i) => {
+  return r30Pool[i] > 0 ? Math.round(d[3] / r30Pool[i] * 10000) / 100 : 0;
+});
+new Chart(document.getElementById('chart_cancel_vs_new'), {
+  type: 'bar',
+  data: {
+    labels: flowLabels,
+    datasets: [
+      {label:'30d New Sub Pool',data:r30Pool,backgroundColor:'rgba(34,197,94,0.35)',borderColor:'#22c55e',borderWidth:1,yAxisID:'y',order:3},
+      {label:'Daily Cancels',data:rawCancels,backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1,yAxisID:'y',order:2},
+      {label:'Early Cancel Rate (%)',data:earlyCancelRate,type:'line',borderColor:'#eab308',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointRadius:0,order:1}
+    ]
+  },
+  options:{
+    plugins:{
+      title:{display:true,text:'Daily Cancels / 30-Day New Sub Pool = Early Cancel Rate',font:{size:13}},
+      subtitle:{display:true,text:'~6-7% of recent new subs cancel daily. Jan spike from holiday renewal wave.',font:{size:10},color:'#8b8fa3'},
+      legend:{labels:{usePointStyle:true}},
+      tooltip:{callbacks:{label:function(ctx){
+        if (ctx.dataset.yAxisID==='y1') return ctx.dataset.label+': '+ctx.parsed.y.toFixed(2)+'%';
+        return ctx.dataset.label+': '+ctx.parsed.y.toLocaleString();
+      }}}
+    },
+    scales:{
+      x:{ticks:{maxTicksLimit:10}},
+      y:{position:'left',beginAtZero:true,title:{display:true,text:'Users'}},
+      y1:{position:'right',title:{display:true,text:'Early Cancel Rate (%)'},grid:{drawOnChartArea:false},min:0,max:12}
+    }
+  }
+});
+
+// === CHART 1c: Daily Cancel Volume by Plan Type (weekly avg, stacked) ===
+const planWeeks = ['Dec 15','Dec 22','Dec 29','Jan 5','Jan 12','Jan 19','Jan 26','Feb 2','Feb 9','Feb 16','Feb 23','Mar 2','Mar 9','Mar 16'];
+const planCancelData = {
+  monthly_direct: [545,589,709,649,627,664,638,631,586,661,704,675,670,636],
+  monthly_trial:  [362,374,457,455,420,414,441,417,399,411,454,450,416,407],
+  yearly_trial:   [441,473,588,587,545,552,565,546,493,531,540,538,509,476],
+  yearly_direct:  [187,208,267,257,234,235,225,224,213,223,222,228,219,228]
+};
+new Chart(document.getElementById('chart_cancel_rate_by_plan'), {
+  type: 'bar',
+  data: {
+    labels: planWeeks,
+    datasets: [
+      {label:'monthly_direct',data:planCancelData.monthly_direct,backgroundColor:'#ef4444'},
+      {label:'monthly_trial',data:planCancelData.monthly_trial,backgroundColor:'#f97316'},
+      {label:'yearly_trial',data:planCancelData.yearly_trial,backgroundColor:'#3b82f6'},
+      {label:'yearly_direct',data:planCancelData.yearly_direct,backgroundColor:'#22c55e'}
+    ]
+  },
+  options:{
+    plugins:{
+      title:{display:true,text:'Daily Cancels by Plan Type (Weekly Avg)',font:{size:13}},
+      subtitle:{display:true,text:'Monthly dominates flow (60%) even though yearly dominates pool (88%). monthly_direct = largest daily segment.',font:{size:10},color:'#8b8fa3'},
+      tooltip:{callbacks:{label:function(ctx){
+        const total = planCancelData.monthly_direct[ctx.dataIndex]+planCancelData.monthly_trial[ctx.dataIndex]+planCancelData.yearly_trial[ctx.dataIndex]+planCancelData.yearly_direct[ctx.dataIndex];
+        return ctx.dataset.label+': '+ctx.parsed.y+'/day ('+Math.round(ctx.parsed.y/total*100)+'%)';
+      }}}
+    },
+    scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Cancels / Day (weekly avg)'}}}
+  }
+});
+
+// (Section 9 Win-Back charts removed — condensed to KPI cards in appendix)
+
+// === SECTION 5: Segment × Timing — split by Monthly/Yearly ===
+const segNames = ['repeat (2+)','disengaged','same_day','other','engaged','declining','early_basic'];
+const segColors2 = ['#ef4444','#8b8fa3','#f97316','#6b7280','#eab308','#a855f7','#d946ef'];
+const moTimeBuckets = ['Day 0','1-7d','8-30d'];
+const moSegTiming = {
+  'repeat (2+)':[96,138,345], disengaged:[0,94,110], same_day:[131,0,0],
+  other:[0,50,51], engaged:[0,43,36], declining:[0,3,8], early_basic:[0,7,0]
+};
+new Chart(document.getElementById('chart_segment_timing_mo'), {
+  type: 'bar',
+  data: {
+    labels: moTimeBuckets,
+    datasets: segNames.map((seg,i) => ({label:seg,data:moSegTiming[seg],backgroundColor:segColors2[i]}))
+  },
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{title:{display:true,text:'Mo: Segment × Timing',font:{size:11}},
+      subtitle:{display:true,text:'All within 30d. Repeat peaks 8-30d.',font:{size:9},color:'#8b8fa3'},
+      legend:{labels:{boxWidth:8,font:{size:8}}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+'/day'}}},
+    scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,beginAtZero:true,title:{display:true,text:'/ Day',font:{size:9}}}}}
+});
+const yrTimeBuckets = ['Day 0','1-7d','8-30d','31-90d','91-180d','181d+'];
+const yrSegTiming = {
+  'repeat (2+)':[58,32,31,36,29,83], disengaged:[0,26,22,33,42,99], same_day:[109,0,0,0,0,0],
+  other:[0,11,13,16,14,24], engaged:[0,17,12,10,8,14], declining:[0,0,2,2,1,2], early_basic:[0,1,0,0,0,0]
+};
+new Chart(document.getElementById('chart_segment_timing_yr'), {
+  type: 'bar',
+  data: {
+    labels: yrTimeBuckets,
+    datasets: segNames.map((seg,i) => ({label:seg,data:yrSegTiming[seg],backgroundColor:segColors2[i]}))
+  },
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{title:{display:true,text:'Yr: Segment × Timing',font:{size:11}},
+      subtitle:{display:true,text:'Repeat + disengaged spike at 181d+.',font:{size:9},color:'#8b8fa3'},
+      legend:{labels:{boxWidth:8,font:{size:8}}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+'/day'}}},
+    scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,beginAtZero:true,title:{display:true,text:'/ Day',font:{size:9}}}}}
+});
+
+// (Pool vs Daily composition charts removed — data shown in Section 1 stacked bar + Section 3 bridge table)
+
+// === SECTION 3: Stacked horizontal bar — cancel rate broken down by timing ===
+// Each bar = total cancel %, segments = when they cancel
+const histSegs = [
+  {label:'basic_upgrade yearly_trial',  total:46.8, timing:[0.29,0.13,0.20,0.25,0.13]},
+  {label:'returning yearly_trial',      total:42.9, timing:[0.19,0.11,0.21,0.30,0.19]},
+  {label:'basic_upgrade yearly_direct', total:35.4, timing:[0.27,0.12,0.20,0.26,0.15]},
+  {label:'new_sub yearly_trial',        total:34.5, timing:[0.22,0.12,0.22,0.28,0.16]},
+  {label:'returning yearly_direct',     total:33.9, timing:[0.18,0.10,0.21,0.31,0.20]},
+  {label:'new_sub yearly_direct',       total:28.4, timing:[0.20,0.11,0.22,0.29,0.18]},
+];
+const timingNames = ['Same Day','Days 1-7','Days 8-30','1-6 Months','6+ Months'];
+const timingColors = ['#ef4444','#f97316','#eab308','#3b82f6','#22c55e'];
+new Chart(document.getElementById('chart_sub_history'), {
+  type: 'bar',
+  data: {
+    labels: histSegs.map(s => s.label),
+    datasets: timingNames.map((name, ti) => ({
+      label: name,
+      data: histSegs.map(s => Math.round(s.total * s.timing[ti] * 10) / 10),
+      backgroundColor: timingColors[ti],
+    }))
+  },
+  options:{
+    indexAxis:'y',
+    plugins:{
+      title:{display:true,text:'Cancel Rate by Segment — Colored by Time to Cancel',font:{size:13}},
+      tooltip:{callbacks:{label:function(ctx){
+        const seg = histSegs[ctx.dataIndex];
+        return ctx.dataset.label+': '+ctx.parsed.x.toFixed(1)+'pp ('+Math.round(seg.timing[ctx.datasetIndex]*100)+'% of '+seg.total+'%)';
+      }}}
+    },
+    scales:{x:{stacked:true,beginAtZero:true,max:50,title:{display:true,text:'Cancel %'}},y:{stacked:true}}
+  }
+});
+// Heatmap table — Users = subscriber base, Play % = among canceled
+(function(){
+  const rows = [
+    {h:'basic_upgrade',p:'yearly_trial',u:'14.8K',c:46.8,pl:'12.4%'},
+    {h:'returning',p:'yearly_trial',u:'45.2K',c:42.9,pl:'10.3%'},
+    {h:'basic_upgrade',p:'yearly_direct',u:'16.6K',c:35.4,pl:'13.7%'},
+    {h:'new_subscriber',p:'yearly_trial',u:'224K',c:34.5,pl:'8.1%'},
+    {h:'returning',p:'yearly_direct',u:'38.0K',c:33.9,pl:'10.4%'},
+    {h:'new_subscriber',p:'yearly_direct',u:'76.4K',c:28.4,pl:'9.6%'},
+    {h:'basic_upgrade',p:'monthly_direct',u:'16.6K',c:19.2,pl:'22.5%'},
+    {h:'returning',p:'monthly_direct',u:'26.7K',c:13.6,pl:'17.0%'},
+    {h:'basic_upgrade',p:'monthly_trial',u:'2.2K',c:12.3,pl:'14.4%'},
+    {h:'new_subscriber',p:'monthly_direct',u:'56.1K',c:10.3,pl:'18.1%'},
+    {h:'new_subscriber',p:'monthly_trial',u:'79.8K',c:9.0,pl:'10.5%'},
+    {h:'returning',p:'monthly_trial',u:'5.6K',c:8.5,pl:'18.6%'},
+  ];
+  const tbl = document.getElementById('heatmap_table');
+  rows.forEach(r => {
+    const a = Math.min(0.8, Math.max(0.1, (r.c - 8) / 40 * 0.7 + 0.1));
+    const tr = document.createElement('tr');
+    const playVal = parseFloat(r.pl);
+    const playClass = playVal >= 18 ? 'good' : '';
+    tr.innerHTML = `<td><span class="tag ${r.c>40?'tag-red':r.c>30?'tag-yellow':r.c>15?'':'tag-green'}">${r.h}</span></td><td>${r.p}</td><td>${r.u}</td><td style="background:rgba(239,68,68,${a.toFixed(2)});font-weight:600;border-radius:3px">${r.c}%</td><td class="${playClass}">${r.pl}</td>`;
+    tbl.appendChild(tr);
+  });
+})();
+
+// === SECTION 3b: Behavioral Gap — Canceled vs Not ===
+(function(){
+  const segs = [
+    {s:'first_time × monthly_trial',   nc:{play:13.0,g7:23.1,ug7:15.4}, c:{play:10.6,g7:18.0,ug7:12.2}},
+    {s:'first_time × monthly_direct',  nc:{play:20.4,g7:40.1,ug7:25.9}, c:{play:18.3,g7:36.1,ug7:24.3}},
+    {s:'first_time × yearly_trial',    nc:{play:13.5,g7:23.3,ug7:15.9}, c:{play:8.2,g7:12.6,ug7:8.8}},
+    {s:'first_time × yearly_direct',   nc:{play:15.5,g7:26.5,ug7:18.2}, c:{play:9.8,g7:14.6,ug7:10.3}},
+    {s:'basic_upgrade × monthly_direct',nc:{play:26.9,g7:56.1,ug7:36.0},c:{play:22.8,g7:42.8,ug7:28.4}},
+    {s:'basic_upgrade × yearly_trial',  nc:{play:19.1,g7:34.8,ug7:23.5},c:{play:12.5,g7:20.0,ug7:13.9}},
+    {s:'basic_upgrade × yearly_direct', nc:{play:21.0,g7:37.0,ug7:25.3},c:{play:13.8,g7:22.3,ug7:15.6}},
+    {s:'returning × monthly_direct',    nc:{play:20.7,g7:41.0,ug7:26.2},c:{play:17.1,g7:35.4,ug7:22.7}},
+    {s:'returning × yearly_trial',      nc:{play:15.5,g7:26.3,ug7:17.8},c:{play:10.4,g7:16.5,ug7:11.3}},
+    {s:'returning × yearly_direct',     nc:{play:16.3,g7:28.9,ug7:19.2},c:{play:10.5,g7:16.9,ug7:11.9}},
+  ];
+  const tbl = document.getElementById('behavior_segment_table');
+  segs.forEach(d => {
+    const playGap = (d.nc.play - d.c.play).toFixed(1);
+    const gamesGap = Math.round((1 - d.c.g7 / d.nc.g7) * 100);
+    const isYearly = d.s.includes('yearly');
+    const signal = gamesGap > 30 ? '🔴 strong' : gamesGap > 15 ? '🟡 moderate' : '🟢 weak';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="font-size:11px">${d.s}</td>
+      <td>${d.nc.play}%</td><td>${d.nc.g7}</td>
+      <td>${d.c.play}%</td><td>${d.c.g7}</td>
+      <td style="color:${parseFloat(playGap)>3?'var(--red)':'var(--yellow)'};font-weight:600">${playGap}pp</td>
+      <td style="color:${gamesGap>30?'var(--red)':'var(--yellow)'};font-weight:600">-${gamesGap}%</td>
+      <td style="font-size:10px">${signal}</td>`;
+    tbl.appendChild(tr);
+  });
+
+  // Chart: dumbbell / paired bars showing gap
+  const labels = segs.map(d => d.s.replace(' × ','\n'));
+  new Chart(document.getElementById('chart_behavior_gap'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {label:'Not Canceled',data:segs.map(d=>d.nc.g7),backgroundColor:'rgba(34,197,94,0.7)',borderColor:'#22c55e',borderWidth:1},
+        {label:'Canceled',data:segs.map(d=>d.c.g7),backgroundColor:'rgba(239,68,68,0.7)',borderColor:'#ef4444',borderWidth:1}
+      ]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        title:{display:true,text:'Games/7d: Canceled vs Not-Canceled',font:{size:13}},
+        subtitle:{display:true,text:'Yearly segments show 35-50% gap. Monthly segments nearly identical.',font:{size:10},color:'#8b8fa3'},
+        legend:{labels:{boxWidth:10,font:{size:10}}}
+      },
+      scales:{
+        x:{beginAtZero:true,title:{display:true,text:'Games per 7 days',font:{size:10}}},
+        y:{ticks:{font:{size:9}}}
+      }
+    }
+  });
+})();
+
+// === SECTION 4: Cancel Frequency + Prior Plan charts removed (content moved to 2.4 data quality section) ===
+
+// === SECTION 5: All Behavioral Dimensions with Timing Distribution ===
+const allDims = [
+  {dim:'Plan',val:'yearly',subs:415,cancel:34.7,t:[22.3,11.8,10.7,25.6,29.6],color:'#3b82f6'},
+  {dim:'Plan',val:'monthly',subs:188,cancel:11.0,t:[20.4,30.0,49.4,0.1,0.1],color:'#ef4444'},
+  {dim:'History',val:'basic_upgrade',subs:50,cancel:32.4,t:[25.6,25.5,35.2,6.5,7.2],color:'#d946ef'},
+  {dim:'History',val:'first_time',subs:436,cancel:25.6,t:[20.9,22.2,33.3,10.5,13.1],color:'#d946ef'},
+  {dim:'History',val:'returning',subs:116,cancel:31.4,t:[19.3,22.5,34.6,12.4,11.3],color:'#d946ef'},
+  {dim:'Trial',val:'trial',subs:373,cancel:30.0,t:[21.7,18.9,28.7,14.5,16.1],color:'#a855f7'},
+  {dim:'Trial',val:'direct',subs:230,cancel:23.0,t:[18.8,21.6,40.7,7.6,11.2],color:'#a855f7'},
+  {dim:'Platform',val:'apple',subs:478,cancel:29.4,t:[20.1,20.8,34.4,11.7,12.9],color:'#f97316'},
+  {dim:'Platform',val:'google',subs:97,cancel:21.5,t:[22.2,16.0,32.4,10.3,19.1],color:'#f97316'},
+  {dim:'Platform',val:'other',subs:28,cancel:11.9,t:[18.9,20.7,35.7,6.4,18.4],color:'#f97316'},
+  {dim:'Tenure',val:'d181+',subs:162,cancel:29.5,t:[19.3,18.7,32.9,13.5,15.6],color:'#3b82f6'},
+  {dim:'Tenure',val:'d31-d180',subs:94,cancel:28.7,t:[20.1,19.5,34.5,11.4,14.5],color:'#3b82f6'},
+  {dim:'Tenure',val:'d7-d30',subs:57,cancel:27.4,t:[20.7,19.4,33.8,10.9,15.2],color:'#3b82f6'},
+  {dim:'Tenure',val:'d0',subs:240,cancel:26.6,t:[21.3,21.5,34.9,10.1,12.1],color:'#3b82f6'},
+  {dim:'Tenure',val:'d1-d6',subs:50,cancel:21.2,t:[19.4,20.9,36.4,9.8,13.5],color:'#3b82f6'},
+  {dim:'Conversion',val:'non_onboarding',subs:395,cancel:28.4,t:[19.8,19.5,34.1,11.8,14.8],color:'#22c55e'},
+  {dim:'Conversion',val:'onboarding',subs:160,cancel:27.8,t:[21.5,22.2,34.5,10.5,11.3],color:'#22c55e'},
+  {dim:'Conversion',val:'unknown',subs:48,cancel:16.4,t:[22.0,18.8,32.8,9.7,16.7],color:'#22c55e'},
+  {dim:'Country',val:'US',subs:279,cancel:28.0,t:[19.6,22.5,34.5,11.3,12.1],color:'#eab308'},
+  {dim:'Country',val:'Non-US',subs:324,cancel:26.8,t:[21.0,18.3,33.9,11.4,15.4],color:'#eab308'},
+  {dim:'Reinstall',val:'first_install',subs:255,cancel:27.4,t:[22.9,21.8,34.7,10.3,10.4],color:'#8b8fa3'},
+  {dim:'Reinstall',val:'reinstall',subs:348,cancel:27.2,t:[18.4,18.9,33.7,12.2,16.8],color:'#8b8fa3'},
+];
+const dimTimingNames = ['Same Day','Days 1-7','Days 8-30','1-6 Months','6+ Months'];
+const dimTimingColors = ['#ef4444','#f97316','#eab308','#3b82f6','#22c55e'];
+new Chart(document.getElementById('chart_dim_timing_v2'), {
+  type: 'bar',
+  data: {
+    labels: allDims.map(d => `${d.dim}: ${d.val}`),
+    datasets: dimTimingNames.map((name, ti) => ({
+      label: name,
+      data: allDims.map(d => Math.round(d.cancel * d.t[ti] / 100 * 10) / 10),
+      backgroundColor: dimTimingColors[ti],
+    }))
+  },
+  options:{
+    indexAxis:'y',
+    plugins:{
+      title:{display:true,text:'Cancel Rate by Dimension — Colored by Time to Cancel',font:{size:13}},
+      tooltip:{callbacks:{label:function(ctx){
+        const d = allDims[ctx.dataIndex];
+        return ctx.dataset.label+': '+ctx.parsed.x.toFixed(1)+'pp ('+d.t[ctx.datasetIndex]+'% of cancels)';
+      }}}
+    },
+    scales:{x:{stacked:true,beginAtZero:true,max:40,title:{display:true,text:'Pool % (currently canceled)'}},y:{stacked:true}}
+  }
+});
+// === SECTION 2: Sparkline table — monthly cancel timing, yearly cancel timing, tenure ===
+// Monthly cancel: [Same Day, 1-7d, 8-30d]
+// Yearly cancel:  [Same Day, 1-7d, 8-30d, 1-6mo, 6mo+]
+// Tenure:         [0-30d, 31-90d, 91-180d, 181-365d, 365d+]
+const sparkData = {
+  'Plan:yearly':    {yr:[22.3,11.8,10.7,25.6,29.6], tn:[32.7,12.4,10.2,22.5,22.2]},
+  'Plan:monthly':   {mo:[20.4,30.0,49.4], tn:[40.2,20.8,12.4,11.6,14.9]},
+  'History:basic_upgrade': {mo:[23.8,30.7,45.6], yr:[29.9,13.0,10.4,22.2,24.5], tn:[43.5,17.0,11.5,14.9,13.2]},
+  'History:first_time':    {mo:[20.1,29.9,49.9], yr:[22.1,11.6,10.4,24.7,31.2], tn:[37.1,17.5,11.2,15.9,18.2]},
+  'History:returning':     {mo:[18.9,30.1,50.9], yr:[19.8,11.8,11.6,29.7,27.1], tn:[33.6,17.5,12.5,16.9,19.5]},
+  'Trial:trial':   {mo:[20.0,30.5,49.2], yr:[24.1,13.1,11.0,25.1,26.7], tn:[37.8,19.0,11.1,15.7,16.5]},
+  'Trial:direct':  {mo:[20.7,29.7,49.6], yr:[18.2,8.8,9.9,26.7,36.4], tn:[36.6,15.9,11.9,16.4,19.2]},
+  'Platform:apple':  {mo:[20.2,30.8,48.9], yr:[22.4,12.5,11.2,26.4,27.5], tn:[36.7,17.0,11.8,15.5,18.9]},
+  'Platform:google': {mo:[21.9,25.6,52.4], yr:[22.5,7.9,9.0,22.4,38.3], tn:[41.7,19.8,10.0,17.7,10.8]},
+  'Platform:other':  {mo:[20.7,26.0,53.3], yr:[19.8,11.7,5.6,16.7,46.3], tn:[36.7,17.0,11.8,15.5,18.9]},
+  'Tenure:d181+':    {mo:[13.2,29.9,56.6], yr:[7.3,5.1,5.4,15.9,66.3]},
+  'Tenure:d31-d180': {mo:[13.9,30.2,55.8], yr:[6.7,3.3,8.4,81.6,0]},
+  'Tenure:d7-d30':   {mo:[16.3,25.5,58.2], yr:[38.8,32.2,29.0,0,0]},
+  'Tenure:d0':       {mo:[100,0,0], yr:[100,0,0,0,0]},
+  'Tenure:d1-d6':    {mo:[21.2,78.8,0], yr:[75.1,24.9,0,0,0]},
+  'Conversion:non_onboarding': {mo:[20.5,29.7,49.7], yr:[21.7,11.9,10.7,25.9,29.8], tn:[36.0,15.8,11.4,16.8,20.0]},
+  'Conversion:onboarding':     {mo:[20.3,31.2,48.4], yr:[23.3,11.9,10.8,25.1,28.9], tn:[42.2,21.5,11.7,13.4,11.3]},
+  'Conversion:unknown':        {mo:[20.8,26.9,52.2], yr:[25.9,10.2,10.3,22.7,30.9], tn:[26.7,17.0,11.4,19.9,25.1]},
+  'Country:US':      {mo:[20.4,30.0,49.4], yr:[22.3,11.8,10.7,25.6,29.6], tn:[39.5,18.1,11.4,14.6,16.4]},
+  'Country:Non-US':  {mo:[20.4,30.0,49.4], yr:[22.3,11.8,10.7,25.6,29.6], tn:[35.2,16.9,11.6,17.3,19.1]},
+  'Reinstall:first_install': {mo:[21.9,30.4,47.6], yr:[27.1,14.4,11.6,24.1,22.7], tn:[46.0,19.9,11.0,12.8,10.3]},
+  'Reinstall:reinstall':     {mo:[19.0,29.7,51.3], yr:[18.7,9.8,9.9,26.7,34.8], tn:[29.3,15.3,12.0,18.8,24.5]},
+};
+function drawSparkBars(canvas, data, color) {
+  if (!data || data.every(v => v === 0)) return;
+  const dpr = window.devicePixelRatio || 1;
+  const dw = canvas.clientWidth, dh = canvas.clientHeight;
+  canvas.width = dw * dpr; canvas.height = dh * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const n = data.length;
+  const maxVal = Math.max(...data, 1);
+  const barW = Math.min(18, (dw * 0.7) / n);
+  const barGap = Math.min(4, (dw * 0.08) / Math.max(n - 1, 1));
+  const groupW = n * barW + (n - 1) * barGap;
+  const offsetX = (dw - groupW) / 2; // center the group
+  const labelH = 10, pad = 2;
+  const barArea = dh - labelH - pad;
+  for (let i = 0; i < n; i++) {
+    const x = offsetX + i * (barW + barGap);
+    const h = (data[i] / maxVal) * (barArea - pad);
+    const y = pad + barArea - h;
+    ctx.fillStyle = color.replace(')', ',0.55)').replace('rgb', 'rgba');
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, h, 2);
+    ctx.fill();
+    // Label below each bar
+    ctx.fillStyle = '#8b8fa3';
+    ctx.font = '8px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    if (data[i] >= 5) {
+      ctx.fillText(Math.round(data[i]) + '%', x + barW / 2, dh - 1);
+    }
+  }
+}
+// Build dimension table with 3 sparkline columns
+(function(){
+  const tbl = document.getElementById('dim_table_v2');
+  let lastDim = '';
+  allDims.forEach((d, idx) => {
+    if (d.dim !== lastDim && lastDim !== '') {
+      const sep = document.createElement('tr');
+      sep.innerHTML = '<td colspan="8" style="border:none;height:2px;background:var(--border)"></td>';
+      tbl.appendChild(sep);
+    }
+    lastDim = d.dim;
+    const a = Math.min(0.8, Math.max(0.1, (d.cancel - 10) / 25 * 0.7 + 0.1));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:${d.color}">&#9679;</td><td>${d.dim}</td><td>${d.val}</td><td>${d.subs}K</td><td style="background:rgba(239,68,68,${a.toFixed(2)});font-weight:600;border-radius:3px">${d.cancel}%</td><td style="text-align:center;padding:4px 6px"><canvas id="spark_mo_${idx}" style="width:100%;height:32px;display:block"></canvas></td><td style="text-align:center;padding:4px 6px"><canvas id="spark_yr_${idx}" style="width:100%;height:32px;display:block"></canvas></td><td style="text-align:center;padding:4px 6px"><canvas id="spark_tn_${idx}" style="width:100%;height:32px;display:block"></canvas></td>`;
+    tbl.appendChild(tr);
+  });
+  requestAnimationFrame(() => {
+    allDims.forEach((d, idx) => {
+      const key = d.dim + ':' + d.val;
+      const sd = sparkData[key];
+      if (!sd) return;
+      const moC = document.getElementById('spark_mo_' + idx);
+      const yrC = document.getElementById('spark_yr_' + idx);
+      const tnC = document.getElementById('spark_tn_' + idx);
+      if (sd.mo && moC) drawSparkBars(moC, sd.mo, 'rgb(239,68,68)');
+      if (sd.yr && yrC) drawSparkBars(yrC, sd.yr, 'rgb(59,130,246)');
+      if (sd.tn && tnC) drawSparkBars(tnC, sd.tn, 'rgb(34,197,94)');
+    });
+  });
+})();
+
+// === SECTION 6: Daily Cancel Anatomy ===
+new Chart(document.getElementById('chart_daily_by_freq'), {
+  type: 'bar',
+  data: {
+    labels: ['first_cancel','repeat (2-3)','serial (4+)'],
+    datasets: [
+      {label:'Monthly',data:[505,353,217],backgroundColor:'#ef4444'},
+      {label:'Yearly',data:[475,177,72],backgroundColor:'#3b82f6'}
+    ]
+  },
+  options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Frequency × Plan (Mar 9-25 avg, post-dedup)',font:{size:11}},
+    legend:{labels:{boxWidth:10,font:{size:9}}},
+    tooltip:{callbacks:{label:ctx=>{const totals=[980,530,289]; return ctx.dataset.label+': '+ctx.parsed.y+' ('+Math.round(ctx.parsed.y/1805*100)+'%)'}}}},
+    scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,beginAtZero:true,title:{display:true,text:'/ Day',font:{size:9}}}}}
+});
+new Chart(document.getElementById('chart_daily_by_engagement'), {
+  type: 'bar',
+  data: {
+    labels: ['no play 30d','no play 7d only','light (1-2d/7d)','moderate (3-5d/7d)','heavy (6+d/7d)'],
+    datasets: [
+      {label:'Monthly',data:[275,233,321,147,37],backgroundColor:'#ef4444'},
+      {label:'Yearly',data:[264,137,168,63,13],backgroundColor:'#3b82f6'}
+    ]
+  },
+  options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Engagement × Plan (Mar 9-25 avg, post-dedup)',font:{size:11}},
+    subtitle:{display:true,text:'MECE: 30d=0 → 7d=0 (but played 8-30d ago) → 1-2d/7d → 3-5d/7d → 6+d/7d',font:{size:8},color:'#8b8fa3'},
+    legend:{labels:{boxWidth:10,font:{size:9}}},
+    tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+'/day (Mar 9-25 avg)'}}},
+    scales:{x:{stacked:true,ticks:{font:{size:9},maxRotation:45}},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Cancels / Day',font:{size:9}}}}}
+});
+new Chart(document.getElementById('chart_inactivity_cancel'), {
+  type: 'line',
+  data: {
+    labels: ['0 days','1-2 days','3-5 days','6-7 days','8+ days'],
+    datasets: [
+      {label:'Monthly Cancel Rate (%)',data:[4.45,3.78,2.85,2.38,2.04],borderColor:'#ef4444',borderWidth:2.5,tension:0.3,pointRadius:5,pointBackgroundColor:'#ef4444'},
+      {label:'Yearly Cancel Rate (%)',data:[0.30,0.20,0.12,0.09,0.06],borderColor:'#3b82f6',borderWidth:2.5,tension:0.3,pointRadius:5,pointBackgroundColor:'#3b82f6',yAxisID:'y1'}
+    ]
+  },
+  options:{
+    plugins:{title:{display:true,text:'Cancel Rate vs Play Activity (Play Days Last 14d) — More Play = Less Cancel',font:{size:13}},
+      legend:lineLegend,
+      subtitle:{display:true,text:'Monthly 2.2× gap · Yearly 5× gap between inactive and heavy. Daily cancel rate = cancels on that date / segment base. Mar 9-25.',font:{size:10},color:'#8b8fa3'},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+'%'}}},
+    scales:{
+      y:{position:'left',title:{display:true,text:'Monthly Cancel Rate (%)'},min:0,max:5},
+      y1:{position:'right',title:{display:true,text:'Yearly Cancel Rate (%)'},min:0,max:0.35,grid:{drawOnChartArea:false}},
+      x:{title:{display:true,text:'Play Days in Last 14 Days'}}
+    }
+  }
+});
+
+// (Cancel timing by history + was-basic charts removed — data now in sparkline table)
+
+// === SECTION 6: Save Rate Scenarios with Re-Cancel Discount ===
+// Conservative: 1 save = 1 billing cycle. But saved users can re-cancel.
+// Re-cancel rates: repeat = high (they always come back to cancel), non-repeat = lower
+const intSegs = [
+  {label:'repeat (2+)',vol:819,moPct:0.682,moPrice:14.33,yrPrice:65.26,
+   moRecancel:0.50, yrRecancel:0.65}, // 50% monthly re-cancel within 1mo, 65% yearly before renewal
+  {label:'disengaged',vol:415,moPct:0.478,moPrice:14.50,yrPrice:62.00,
+   moRecancel:0.30, yrRecancel:0.40},
+  {label:'same_day',vol:235,moPct:0.545,moPrice:14.50,yrPrice:62.00,
+   moRecancel:0.20, yrRecancel:0.25}, // low re-cancel — many are trial converts who cancel once
+  {label:'other',vol:183,moPct:0.564,moPrice:14.50,yrPrice:62.00,
+   moRecancel:0.25, yrRecancel:0.35},
+  {label:'engaged',vol:133,moPct:0.561,moPrice:14.50,yrPrice:62.00,
+   moRecancel:0.15, yrRecancel:0.20}, // lowest — they're engaged, most likely to stay if saved
+  {label:'declining',vol:20,moPct:0.629,moPrice:14.50,yrPrice:62.00,
+   moRecancel:0.35, yrRecancel:0.45},
+  {label:'early_basic',vol:1,moPct:0.844,moPrice:14.50,yrPrice:62.00,
+   moRecancel:0.30, yrRecancel:0.40},
+];
+// Revenue per save: 1 billing cycle × price × (1 - re-cancel probability)
+intSegs.forEach(s => {
+  const moGross = s.moPct * s.moPrice;
+  const yrGross = (1 - s.moPct) * s.yrPrice;
+  s.grossPerSave = moGross + yrGross;
+  const moNet = s.moPct * s.moPrice * (1 - s.moRecancel);
+  const yrNet = (1 - s.moPct) * s.yrPrice * (1 - s.yrRecancel);
+  s.netPerSave = moNet + yrNet;
+});
+
+const saveRates = [5,10,15,20];
+const grossAnnual = saveRates.map(r => {
+  return Math.round(intSegs.reduce((a,s) => a + s.vol * s.grossPerSave, 0) * 365 * r / 100 / 1e6 * 10) / 10;
+});
+const netAnnual = saveRates.map(r => {
+  return Math.round(intSegs.reduce((a,s) => a + s.vol * s.netPerSave, 0) * 365 * r / 100 / 1e6 * 10) / 10;
+});
+const reCancelLoss = grossAnnual.map((g,i) => Math.round((g - netAnnual[i]) * 10) / 10);
+
+// --- Heatmap for Return Rate by Tenure table ---
+(function() {
+  const tbl = document.getElementById('tbl_return_by_tenure');
+  if (!tbl) return;
+  const rows = tbl.querySelectorAll('tr');
+  for (let i = 2; i < rows.length; i++) { // skip 2 header rows
+    const cells = rows[i].querySelectorAll('td');
+    for (let j = 1; j < cells.length; j++) {
+      const text = cells[j].textContent.trim().replace('%','');
+      const val = parseFloat(text);
+      if (isNaN(val) || val === 0) continue;
+      const intensity = Math.min(val / 30, 1);
+      cells[j].style.backgroundColor = 'rgba(34, 197, 94,' + (0.1 + intensity * 0.5) + ')';
+      cells[j].style.borderRadius = '3px';
+    }
+  }
+})();
+
+new Chart(document.getElementById('chart_save_scenarios'), {
+  type: 'bar',
+  data: {
+    labels: saveRates.map(r => r+'%'),
+    datasets: [
+      {label:'Gross (if all saves stick)',data:grossAnnual,backgroundColor:'rgba(99,102,241,0.2)',borderColor:'#6366f1',borderWidth:2,borderDash:[4,3]},
+      {label:'Net (after re-cancellation)',data:netAnnual,backgroundColor:'#22c55e',borderColor:'#16a34a',borderWidth:1},
+    ]
+  },
+  options:{
+    plugins:{
+      title:{display:true,text:'Annual Revenue Saved by Save Rate',font:{size:14}},
+      subtitle:{display:true,text:'1 save = 1 billing cycle. Gap = lost to re-cancellation (repeat 50-65%, engaged 15-20%).',font:{size:10},color:'#8b8fa3'},
+      legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>{
+        const i=ctx.dataIndex;
+        if(ctx.datasetIndex===0) return 'Gross: $'+ctx.parsed.y+'M (if every saved user stays)';
+        return 'Net: $'+ctx.parsed.y+'M | Re-cancel loss: $'+reCancelLoss[i]+'M ('+Math.round(reCancelLoss[i]/grossAnnual[i]*100)+'%)';
+      }}}
+    },
+    scales:{
+      x:{title:{display:true,text:'Save Rate',font:{size:11}}},
+      y:{beginAtZero:true,title:{display:true,text:'$M / Year'},ticks:{callback:v=>'$'+v+'M'}}
+    }
+  },
+  plugins:[{
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx;
+      // Data labels on each bar
+      chart.data.datasets.forEach((ds,di) => {
+        chart.getDatasetMeta(di).data.forEach((bar,i) => {
+          ctx.save();
+          ctx.fillStyle = di===0 ? '#6366f1' : '#16a34a';
+          ctx.font = 'bold 12px -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('$'+ds.data[i]+'M', bar.x, bar.y - 6);
+          ctx.restore();
+        });
+      });
+      // Re-cancel loss between bars
+      const grossMeta = chart.getDatasetMeta(0);
+      const netMeta = chart.getDatasetMeta(1);
+      grossMeta.data.forEach((gBar,i) => {
+        const nBar = netMeta.data[i];
+        const loss = reCancelLoss[i];
+        const pct = Math.round(loss / grossAnnual[i] * 100);
+        ctx.save();
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '10px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        const midX = (gBar.x + nBar.x) / 2;
+        ctx.fillText('-$'+loss+'M ('+pct+'%)', midX, Math.min(gBar.y, nBar.y) - 22);
+        ctx.restore();
+      });
+    }
+  }]
+});
+
+// === SECTION 10: Repeat Canceller Gap Distribution ===
+const gapData = {
+  repeat: [{b:'Overlap',p:4.4},{b:'Same day',p:1.2},{b:'1-7d',p:7.3},{b:'8-30d',p:16.5},{b:'31-90d',p:19.2},{b:'91-180d',p:14.2},{b:'181-365d',p:17.0},{b:'365d+',p:20.2}],
+  serial: [{b:'Overlap',p:9.5},{b:'Same day',p:0.8},{b:'1-7d',p:5.7},{b:'8-30d',p:15.9},{b:'31-90d',p:22.8},{b:'91-180d',p:14.7},{b:'181-365d',p:16.1},{b:'365d+',p:14.4}]
+};
+new Chart(document.getElementById('chart_serial_gaps'), {
+  type: 'bar',
+  data: {
+    labels: gapData.repeat.map(d=>d.b),
+    datasets: [
+      {label:'Repeat (2-3 cancels)',data:gapData.repeat.map(d=>d.p),backgroundColor:'rgba(249,115,22,0.6)',borderColor:'#f97316',borderWidth:1},
+      {label:'Serial (4+ cancels)',data:gapData.serial.map(d=>d.p),backgroundColor:'rgba(239,68,68,0.6)',borderColor:'#ef4444',borderWidth:1}
+    ]
+  },
+  options:{
+    plugins:{title:{display:true,text:'Gap Between Subscriptions (%)',font:{size:13}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+'%'}}},
+    scales:{y:{beginAtZero:true,title:{display:true,text:'% of Transitions'}}}
+  }
+});
+
+// === SECTION 11: Cannibalization Model ===
+// Cumulative return rates [m1, m2, m3, m4, m6, m9, m12] by stage
+const windowLabels = ['1mo','2mo','3mo','4mo','6mo','9mo','12mo'];
+const returnCurves = {
+  monthly: {
+    '1st':  [3.4, 6.9, 8.7, 10.0, 12.0, 14.0, 15.3],
+    '2nd':  [4.3, 9.6, 12.2, 14.0, 17.3, 20.4, 22.4],
+    '3rd':  [5.6, 10.0, 13.3, 15.7, 19.6, 24.1, 26.9],
+    '4-5th':[6.2, 13.0, 16.0, 19.7, 24.6, 28.6, 31.8],
+    '6th+': [11.3, 23.1, 29.0, 34.4, 38.7, 43.0, 43.5]
+  },
+  yearly: {
+    '1st':  [1.0, 1.6, 2.3, 2.8, 4.1, 6.1, 8.6],
+    '2nd':  [0.9, 1.8, 2.8, 3.7, 5.3, 8.5, 13.1],
+    '3rd':  [1.5, 2.8, 4.2, 5.4, 8.5, 12.1, 18.1],
+    '4-5th':[1.1, 3.7, 4.3, 5.1, 7.1, 11.7, 18.6],
+    '6th+': [4.2, 4.2, 4.2, 6.3, 6.3, 14.6, 18.8]
+  }
+};
+// Weighted averages for scenario calculator (repeat = stages 2-6+ weighted by n)
+const segReturnRates = {
+  sr_mo: [4.8, 10.2, 13.0, 15.1, 18.6, 22.1, 24.2],
+  sr_yr: [1.0, 2.1, 3.1, 4.1, 6.0, 9.4, 14.3],
+  ns_mo: [3.4, 6.9, 8.7, 10.0, 12.0, 14.0, 15.3],
+  ns_yr: [1.0, 1.6, 2.3, 2.8, 4.1, 6.1, 8.6]
+};
+const stageColors = ['#6366f1','#3b82f6','#22c55e','#f97316','#ef4444'];
+const stageNames = ['1st','2nd','3rd','4-5th','6th+'];
+
+// Monthly return curve chart
+new Chart(document.getElementById('chart_return_curve_mo'), {
+  type: 'line',
+  data: {
+    labels: windowLabels,
+    datasets: stageNames.map((s,i) => ({
+      label: s+' sub',
+      data: returnCurves.monthly[s],
+      borderColor: stageColors[i],
+      borderWidth: 2,
+      tension: 0.3,
+      pointRadius: 3,
+      pointBackgroundColor: stageColors[i]
+    }))
+  },
+  options:{
+    plugins:{title:{display:true,text:'Monthly Plans — Cumulative Return %',font:{size:13}},
+      legend:{labels:{usePointStyle:true,pointStyle:'line'}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+'%'}}},
+    scales:{y:{beginAtZero:true,max:50,title:{display:true,text:'% Returned'}},
+      x:{title:{display:true,text:'Months After Cancel'}}}
+  }
+});
+
+// Yearly return curve chart
+new Chart(document.getElementById('chart_return_curve_yr'), {
+  type: 'line',
+  data: {
+    labels: windowLabels,
+    datasets: stageNames.map((s,i) => ({
+      label: s+' sub',
+      data: returnCurves.yearly[s],
+      borderColor: stageColors[i],
+      borderWidth: 2,
+      tension: 0.3,
+      pointRadius: 3,
+      pointBackgroundColor: stageColors[i]
+    }))
+  },
+  options:{
+    plugins:{title:{display:true,text:'Yearly Plans — Cumulative Return %',font:{size:13}},
+      legend:{labels:{usePointStyle:true,pointStyle:'line'}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+'%'}}},
+    scales:{y:{beginAtZero:true,max:25,title:{display:true,text:'% Returned'}},
+      x:{title:{display:true,text:'Months After Cancel'}}}
+  }
+});
+
+// Interactive cannibalization model
+// Window index maps: sel_window value → index in return rate arrays
+// [0]=1mo, [1]=2mo, [2]=3mo, [3]=4mo, [4]=6mo, [5]=9mo, [6]=12mo
+const windowMonths = [1, 2, 3, 4, 6, 9, 12];
+const segments = [
+  {id:'sr_mo', label:'Repeat Monthly', vol:578, price:14.33, isMonthly:true, ratesKey:'sr_mo'},
+  {id:'sr_yr', label:'Repeat Yearly', vol:269, price:65.26, isMonthly:false, ratesKey:'sr_yr'},
+  {id:'ns_mo', label:'Non-repeat Monthly', vol:533, price:14.60, isMonthly:true, ratesKey:'ns_mo'},
+  {id:'ns_yr', label:'Non-repeat Yearly', vol:480, price:65.00, isMonthly:false, ratesKey:'ns_yr'},
+];
+
+function updateModel() {
+  const winIdx = parseInt(document.getElementById('sel_window').value);
+  const disc = parseInt(document.getElementById('slider_disc').value) / 100;
+  const save = parseInt(document.getElementById('slider_save').value) / 100;
+  const months = windowMonths[winIdx];
+  document.getElementById('disc_label').textContent = Math.round(disc*100)+'%';
+  document.getElementById('save_label').textContent = Math.round(save*100)+'%';
+
+  let totalNaive=0, totalCannibal=0, totalNet=0;
+  segments.forEach(s => {
+    const pReturn = segReturnRates[s.ratesKey][winIdx] / 100;
+    // Revenue if saved: monthly = min(months, 3) × price × (1-disc), yearly = price × (1-disc)
+    // Monthly users: we save them for the discount window (capped at what makes sense)
+    // Yearly users: we save them for 1 renewal cycle
+    let naiveRev;
+    if (s.isMonthly) {
+      naiveRev = months * s.price * (1 - disc);
+    } else {
+      // Yearly: discount applies to 1 renewal regardless of window
+      naiveRev = s.price * (1 - disc);
+    }
+    // Cannibalization: P(natural return) × expected revenue they'd generate anyway
+    // Avg returner comes back at midpoint of window → pays for remaining months
+    let cannibalRev;
+    if (s.isMonthly) {
+      cannibalRev = pReturn * (months / 2) * s.price;
+    } else {
+      cannibalRev = pReturn * s.price;
+    }
+    const netPerSave = naiveRev - cannibalRev;
+    const annualNet = s.vol * save * netPerSave * 365 / 1e6;
+
+    document.getElementById(s.id+'_ret').textContent = (pReturn*100).toFixed(1)+'%';
+    document.getElementById(s.id+'_naive').textContent = '$'+Math.round(naiveRev);
+    document.getElementById(s.id+'_cannibal').textContent = '-$'+Math.round(cannibalRev);
+    document.getElementById(s.id+'_net').textContent = '$'+Math.round(netPerSave);
+    document.getElementById(s.id+'_annual').textContent = '$'+annualNet.toFixed(2)+'M';
+
+    totalNaive += s.vol * save * naiveRev * 365;
+    totalCannibal += s.vol * save * cannibalRev * 365;
+    totalNet += s.vol * save * netPerSave * 365;
+  });
+  document.getElementById('total_naive').textContent = '$'+(totalNaive/1e6).toFixed(1)+'M';
+  document.getElementById('total_cannibal').textContent = '-$'+(totalCannibal/1e6).toFixed(1)+'M';
+  document.getElementById('total_net').textContent = '$'+(totalNet/1e6).toFixed(1)+'M';
+  document.getElementById('total_annual').textContent = '$'+(totalNet/1e6).toFixed(1)+'M';
+  updateCompareChart(disc, save, winIdx);
+}
+
+let compareChart = null;
+function updateCompareChart(disc, save, winIdx) {
+  const ctx = document.getElementById('chart_cannibal_compare');
+  const months = windowMonths[winIdx];
+  const segLabels = segments.map(s => s.label);
+  const naiveData = segments.map(s => {
+    const rev = s.isMonthly ? months * s.price * (1-disc) : s.price * (1-disc);
+    return Math.round(s.vol * save * rev * 365 / 1e6 * 10) / 10;
+  });
+  const cannibalData = segments.map(s => {
+    const pReturn = segReturnRates[s.ratesKey][winIdx] / 100;
+    const nat = s.isMonthly ? pReturn * (months/2) * s.price : pReturn * s.price;
+    return -Math.round(s.vol * save * nat * 365 / 1e6 * 10) / 10;
+  });
+  const netData = segments.map((s,i) => Math.round((naiveData[i] + cannibalData[i]) * 10) / 10);
+  if (compareChart) compareChart.destroy();
+  compareChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: segLabels,
+      datasets: [
+        {label:'Gross Revenue Saved',data:naiveData,backgroundColor:'rgba(34,197,94,0.5)',borderColor:'#22c55e',borderWidth:1},
+        {label:'Cannibalization Cost',data:cannibalData,backgroundColor:'rgba(239,68,68,0.5)',borderColor:'#ef4444',borderWidth:1},
+        {label:'Net Incremental',data:netData,type:'line',borderColor:'#eab308',borderWidth:3,pointRadius:5,pointBackgroundColor:'#eab308'}
+      ]
+    },
+    options:{
+      plugins:{title:{display:true,text:'Yearly Revenue: Gross vs Cannibalization vs Net ($M) — '+months+'mo window',font:{size:13}},
+        tooltip:{callbacks:{label:ctx=>{
+          const v = ctx.parsed.y;
+          return ctx.dataset.label+': '+(v>=0?'+':'')+v.toFixed(1)+'M';
+        }}}},
+      scales:{y:{title:{display:true,text:'$M / Year'}}}
+    }
+  });
+}
+
+document.getElementById('sel_window').addEventListener('change', updateModel);
+document.getElementById('slider_disc').addEventListener('input', updateModel);
+document.getElementById('slider_save').addEventListener('input', updateModel);
+updateModel();
+
+
+// === Heat map for return rate table ===
+(function() {
+  const tbl = document.getElementById('tbl_return_rates');
+  if (!tbl) return;
+  const rows = tbl.querySelectorAll('tr');
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i].querySelectorAll('td');
+    for (let j = 3; j < cells.length; j++) {
+      const text = cells[j].textContent.trim().replace('%','');
+      const val = parseFloat(text);
+      if (isNaN(val)) continue;
+      let r, g, b, a;
+      if (val <= 5) {
+        r = 34; g = 197; b = 94; a = 0.05 + val / 5 * 0.12;
+      } else if (val <= 15) {
+        const t = (val - 5) / 10;
+        r = Math.round(34 + t * 200); g = Math.round(197 - t * 18); b = Math.round(94 - t * 86); a = 0.17 + t * 0.13;
+      } else if (val <= 30) {
+        const t = (val - 15) / 15;
+        r = Math.round(234 + t * 5); g = Math.round(179 - t * 111); b = Math.round(8 - t * 8); a = 0.30 + t * 0.15;
+      } else {
+        r = 239; g = 68; b = 68; a = 0.45 + Math.min((val - 30) / 20, 1) * 0.15;
+      }
+      cells[j].style.backgroundColor = 'rgba('+r+','+g+','+b+','+a+')';
+      cells[j].style.borderRadius = '3px';
+      cells[j].style.padding = '4px 8px';
+    }
+  }
+})();
+// === Collapsible sections ===
+document.querySelectorAll('.slide h2').forEach(h2 => {
+  h2.addEventListener('click', e => {
+    e.preventDefault();
+    h2.parentElement.classList.toggle('collapsed');
+  });
+});
+// Scroll spy for nav highlights
+const tocLinks = document.querySelectorAll('.toc a[href^="#s"]');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    const id = entry.target.id;
+    const link = document.querySelector(`.toc a[href="#${id}"]`);
+    if (link) link.classList.toggle('active', entry.isIntersecting);
+  });
+}, {threshold: 0.1});
+document.querySelectorAll('.slide[id]').forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

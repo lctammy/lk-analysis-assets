@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plus User Cancellation — Sankey</title>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/highcharts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/modules/sankey.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/modules/exporting.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/highcharts-more.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highcharts@11/modules/heatmap.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root { --blue:#3b82f6; --green:#16a34a; --orange:#f59e0b; --red:#ef4444; --purple:#7c3aed;
+  --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+.header { background:linear-gradient(135deg,#ef4444 0%,#f59e0b 100%); padding:18px 24px; color:#fff; }
+.header h1 { font-size:18px; font-weight:700; }
+.header .sub { font-size:12px; color:rgba(255,255,255,.8); margin-top:2px; }
+#filter-summary { font-size:11px; color:rgba(255,255,255,.9); margin-top:4px; font-weight:500; }
+.controls { background:var(--card); border-bottom:1px solid var(--border); padding:10px 24px; display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+.ctrl { display:flex; flex-direction:column; gap:1px; }
+.ctrl label { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.ctrl select { font-size:12px; padding:3px 6px; border:1px solid var(--border); border-radius:4px; background:#fff; min-width:100px; }
+.ms { position:relative; }
+.ms-btn { font-size:12px; padding:3px 8px; border:1px solid var(--border); border-radius:4px; background:#fff; cursor:pointer; display:flex; align-items:center; gap:4px; min-width:80px; white-space:nowrap; }
+.ms-btn:hover { border-color:var(--blue); }
+.ms-btn .badge { background:var(--blue); color:#fff; font-size:9px; border-radius:8px; padding:0 5px; font-weight:700; }
+.ms-drop { position:absolute; top:100%; left:0; z-index:999; background:#fff; border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.12); margin-top:2px; min-width:160px; max-height:260px; overflow-y:auto; display:none; }
+.ms-drop.open { display:block; }
+.ms-drop label { display:flex; align-items:center; gap:6px; padding:4px 10px; font-size:11px; cursor:pointer; }
+.ms-drop label:hover { background:#f1f5f9; }
+.ms-drop .ms-all { border-bottom:1px solid var(--border); font-weight:600; }
+.sep { width:1px; background:var(--border); align-self:stretch; margin:0 4px; }
+#file-upload { padding:40px; text-align:center; }
+.drop-zone { border:2px dashed var(--border); border-radius:12px; padding:40px; cursor:pointer; }
+.drop-zone:hover { border-color:var(--blue); }
+.hidden { display:none; }
+.toggles { background:var(--card); border-bottom:1px solid var(--border); padding:8px 24px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.toggles .tl { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-right:4px; }
+.tog { display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:grab; user-select:none;
+  padding:4px 8px; border:1px solid var(--border); border-radius:6px; background:#fff; transition:all .15s; }
+.tog:active { cursor:grabbing; }
+.tog.dragging { opacity:0.4; border-style:dashed; }
+.tog.drag-over { border-color:var(--blue); background:#eff6ff; }
+.tog.disabled-stage { opacity:0.5; background:#f8fafc; }
+.tog input { accent-color:var(--blue); }
+.tog .arrows { display:none; }
+.chart-wrap { padding:14px 24px; }
+.chart-card { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+#sankey-container { min-height:500px; }
+.stats-row { display:flex; gap:12px; padding:14px 24px; flex-wrap:wrap; }
+.stat { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 14px; flex:1; min-width:120px; }
+.stat .l { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.stat .v { font-size:22px; font-weight:700; margin-top:2px; }
+.stat .d { font-size:11px; color:var(--muted); margin-top:1px; }
+.note { font-size:11px; color:var(--muted); padding:0 24px 14px; }
+.ctrl.compare { border:2px solid var(--blue); border-radius:6px; padding:4px 8px; background:#eff6ff; }
+.ctrl.compare label { color:var(--blue); }
+.compare-grid { display:flex; gap:16px; overflow-x:auto; }
+.compare-panel { flex:1; min-width:500px; }
+.compare-panel .chart-card { height:100%; }
+.compare-panel h4 { font-size:12px; font-weight:700; text-align:center; padding:8px 12px; margin:0; border-bottom:1px solid var(--border); }
+.metric-toggle { background:var(--card); border-bottom:1px solid var(--border); padding:8px 24px; display:flex; gap:16px; align-items:center; }
+.metric-toggle .tl { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.metric-toggle .opt { font-size:11px; padding:3px 10px; border:1px solid var(--border); border-radius:4px; cursor:pointer; background:#fff; }
+.metric-toggle .opt.active { background:var(--red); color:#fff; border-color:var(--red); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Plus User Cancellation — Sankey</h1>
+  <div class="sub">Segment &rarr; Segment &rarr; ... &rarr; Cancellation Outcome — Toggle stages below to explore cancellation patterns</div>
+  <div id="filter-summary"></div>
+</div>
+
+<div id="file-upload">
+  <div class="drop-zone" id="drop-zone">
+    <p style="font-size:28px">&#128194;</p>
+    <p style="font-weight:600;font-size:15px;margin:8px 0">Load journey data</p>
+    <p style="color:var(--muted);font-size:12px">
+      <code>SELECT * FROM sandbox.lingokids_tammyliang_content.plus_user_retention WHERE journey_day = 0</code><br>
+      Drop CSV or click to upload
+    </p>
+    <input type="file" id="csv-input" accept=".csv" style="display:none">
+  </div>
+</div>
+
+<div id="dashboard" class="hidden">
+  <div class="controls" id="controls-bar"></div>
+  <div class="stats-row" id="stats-bar"></div>
+  <div class="metric-toggle" id="metric-bar">
+    <span class="tl">Node metric:</span>
+    <button class="opt active" data-metric="cancel_30d">30d Cancel Rate</button>
+    <button class="opt" data-metric="cancel_timing">Cancel Timing</button>
+    <button class="opt" data-metric="retention">D31-60 Retention</button>
+  </div>
+  <div class="toggles" id="stage-bar"></div>
+  <div class="chart-wrap">
+    <div class="chart-card">
+      <div id="sankey-container"></div>
+    </div>
+  </div>
+  <div class="note">Flow width = user volume. <b>Click any node</b> to highlight its full upstream + downstream path. Node labels show count and cancellation rate. Hover for detail. Only users with retention window included.</div>
+
+  <!-- Segment Importance Section -->
+  <div style="padding:14px 24px;">
+    <div class="chart-card" style="padding:20px;">
+      <h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">Segment Importance — Logistic Regression</h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Each segment's <b>independent effect</b> on 30d cancellation, controlling for all other segments simultaneously. OR > 1 = increases cancellation, OR < 1 = decreases it. Sorted by <b>population impact</b> (effect × segment size). Pre-computed on full cohort (172.3K users).</p>
+      <div id="drivers-chart" style="height:420px;"></div>
+      <h4 style="font-size:13px;font-weight:700;margin:24px 0 4px;">Prioritization: Effect vs Reach</h4>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Top-right = large segment with high cancellation risk. Bottom-right = large protective segment. Left = smaller segments.</p>
+      <div id="drivers-scatter" style="height:380px;"></div>
+      <div id="drivers-table" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- Correlation Heatmap -->
+  <div style="padding:0 24px 14px;">
+    <div class="chart-card" style="padding:20px;">
+      <h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">Segment Correlation Heatmap (Cramér's V)</h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Shows how correlated each pair of segments is. High correlation (dark) = confounders — they overlap and shouldn't both be used for segmentation. Last row/column = correlation with cancellation.</p>
+      <div id="heatmap-chart" style="height:520px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// GLOBALS
+// ================================================================
+let RAW = [], FILTERED = [];
+let activeMetric = 'cancel_30d';
+
+// All available stages — ordered: acquisition first, engagement later, outcome last
+const STAGE_DEFS = [
+  // Acquisition & entry
+  { id: 'channel',    label: 'Acq Channel',     enabled: true },
+  { id: 'trigger',    label: 'Conv Trigger',    enabled: true },
+  { id: 'reinstall',  label: 'Reinstall',       enabled: false },
+  // Subscription
+  { id: 'plan',       label: 'Plan',            enabled: true },
+  { id: 'trial',      label: 'Trial/Direct',    enabled: true },
+  // User history
+  { id: 'basic',      label: 'Was Basic',       enabled: false },
+  { id: 'history',    label: 'Sub History',      enabled: false },
+  { id: 'tenure',     label: 'Tenure',          enabled: false },
+  { id: 'prior_subs', label: 'Prior Subs',      enabled: false },
+  // Demographics
+  { id: 'platform',   label: 'Platform',        enabled: false },
+  { id: 'country',    label: 'Country',         enabled: false },
+  { id: 'age',        label: 'Child Age',       enabled: false },
+  // Engagement (back)
+  { id: 'eng',        label: 'Trial Engagement', enabled: false },
+  { id: 'w0',         label: 'W0 Activation',    enabled: false },
+  { id: 'rfmc',       label: 'RFMC',            enabled: false },
+  { id: 'has_rfmc',   label: 'Has RFMC',        enabled: false },
+  // Outcome — always last
+  { id: 'canc_7d',    label: 'Cancelled 7d',    enabled: false },
+  { id: 'canc',       label: 'Cancelled 30d',   enabled: true },
+  { id: 'canc_any',   label: 'Cancelled (any)', enabled: false },
+  { id: 'canc_time',  label: 'Cancel Timing',   enabled: false },
+  { id: 'ret',        label: 'Retained/Churned', enabled: false },
+];
+let stageOrder = STAGE_DEFS.map(s => ({ ...s }));
+
+const FILTERS = [
+  {col:'subscription_period',label:'Plan'},
+  {col:'if_trial',label:'Trial'},
+  {col:'platform',label:'Platform'},
+  {col:'country_group',label:'Country'},
+  {col:'rfmc_segment',label:'RFMC'},
+  {col:'conversion_trigger',label:'Trigger'},
+  {col:'is_reinstall',label:'Reinstall'},
+  {col:'was_basic_user',label:'Was Basic'},
+  {col:'trial_engagement_level',label:'Trial Eng'},
+  {col:'tenure_bucket',label:'Tenure'},
+  {col:'cancel_timing_bucket',label:'Cancel Timing'},
+  {col:'subscriber_history',label:'Sub History'},
+  {col:'child_age_range',label:'Child Age'},
+  {col:'acquisition_channel',label:'Acq Channel'},
+];
+const COMPARE_OPTIONS = [
+  {col:'__none__',label:'None'},
+  {col:'subscription_period',label:'Plan'},
+  {col:'if_trial',label:'Trial'},
+  {col:'platform',label:'Platform'},
+  {col:'country_group',label:'Country'},
+  {col:'rfmc_segment',label:'RFMC'},
+  {col:'conversion_trigger',label:'Trigger'},
+  {col:'trial_engagement_level',label:'Trial Eng'},
+  {col:'tenure_bucket',label:'Tenure'},
+  {col:'was_basic_user',label:'Was Basic'},
+  {col:'cancelled_30d',label:'Cancelled 30d'},
+  {col:'cancel_timing_bucket',label:'Cancel Timing'},
+  {col:'subscriber_history',label:'Sub History'},
+  {col:'child_age_range',label:'Child Age'},
+  {col:'acquisition_channel',label:'Acq Channel'},
+];
+const PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+
+// ================================================================
+// FILE UPLOAD
+// ================================================================
+const dz = document.getElementById('drop-zone');
+const fi = document.getElementById('csv-input');
+dz.onclick = () => fi.click();
+dz.ondragover = e => { e.preventDefault(); dz.style.borderColor='#3b82f6'; };
+dz.ondragleave = () => { dz.style.borderColor='#e2e8f0'; };
+dz.ondrop = e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); };
+fi.onchange = e => loadFile(e.target.files[0]);
+
+fetch('journey_data.csv').then(r => {
+  if (!r.ok) throw new Error('not found');
+  return r.text();
+}).then(csv => {
+  Papa.parse(csv, { header:true, dynamicTyping:true, skipEmptyLines:true, complete: res => {
+    if (res.data.length > 100) processData(res.data);
+  }});
+}).catch(() => {});
+
+function loadFile(f) {
+  if (!f) return;
+  Papa.parse(f, { header:true, dynamicTyping:true, skipEmptyLines:true, complete: res => {
+    processData(res.data);
+  }});
+}
+
+function processData(data) {
+  RAW = data;
+  RAW.forEach(r => {
+    r.has_retention_window = r.has_retention_window===true || String(r.has_retention_window).toLowerCase()==='true';
+    r.is_active_day = r.is_active_day===true || String(r.is_active_day).toLowerCase()==='true';
+    ['if_trial','games_played','is_retained_next_30d','has_rfmc','has_nongame_activity_30d',
+     'is_reinstall','was_basic_user','trial_games_played','trial_game_active_days',
+     'nongame_plays_30d','journey_day','w0_games_played','w0_active_days','w0_is_active',
+     'prior_sub_count'].forEach(c => { r[c] = Number(r[c]) || 0; });
+    const dtc = r.days_to_cancel;
+    r.days_to_cancel = (dtc!=null && dtc!=='' && String(dtc)!=='null') ? Number(dtc) : null;
+    r.cancelled_30d = (r.days_to_cancel !== null && r.days_to_cancel <= 30) ? 1 : 0;
+    r.cancelled_7d = (r.days_to_cancel !== null && r.days_to_cancel <= 7) ? 1 : 0;
+    r.cancelled_any = (r.days_to_cancel !== null) ? 1 : 0;
+    // Bucket prior subs
+    r.prior_sub_bucket = r.prior_sub_count === 0 ? 'First sub'
+                       : r.prior_sub_count === 1 ? '1 prior'
+                       : r.prior_sub_count <= 3 ? '2-3 prior'
+                       : '4+ prior';
+  });
+  if (new Set(RAW.map(r=>r.journey_day)).size > 1) RAW = RAW.filter(r=>r.journey_day===0);
+  document.getElementById('file-upload').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  buildControls();
+  render();
+}
+
+// ================================================================
+// CONTROLS
+// ================================================================
+function buildControls() {
+  const bar = document.getElementById('controls-bar');
+  let html = '<div class="ctrl compare"><label>Compare by</label><select id="cmp-select">';
+  COMPARE_OPTIONS.forEach(o => { html += `<option value="${o.col}">${o.label}</option>`; });
+  html += '</select></div><div class="sep"></div>';
+  FILTERS.forEach(f => {
+    const vals = [...new Set(RAW.map(r=>r[f.col]))].filter(v=>v!=null&&v!=='').sort();
+    if (vals.length < 2) return;
+    html += `<div class="ctrl"><label>${f.label}</label><div class="ms" data-col="${f.col}">` +
+      `<button class="ms-btn" type="button">All</button><div class="ms-drop">` +
+      `<label class="ms-all"><input type="checkbox" checked data-val="__all__"> All</label>`;
+    vals.forEach(v => {
+      html += `<label><input type="checkbox" data-val="${String(v).replace(/"/g,'&quot;')}"> ${fmtVal(f.col,v)}</label>`;
+    });
+    html += '</div></div></div>';
+  });
+  html += '<div class="ctrl"><label>&nbsp;</label><button onclick="resetFilters()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer">Reset</button></div>';
+  bar.innerHTML = html;
+  document.getElementById('cmp-select').addEventListener('change', render);
+
+  // Wire multi-select dropdowns
+  bar.querySelectorAll('.ms').forEach(ms => {
+    const btn = ms.querySelector('.ms-btn');
+    const drop = ms.querySelector('.ms-drop');
+    const allCb = drop.querySelector('input[data-val="__all__"]');
+    const valCbs = [...drop.querySelectorAll('input:not([data-val="__all__"])')];
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bar.querySelectorAll('.ms-drop.open').forEach(d => { if (d !== drop) d.classList.remove('open'); });
+      drop.classList.toggle('open');
+    });
+
+    function updateBtn() {
+      const checked = valCbs.filter(c => c.checked);
+      if (checked.length === 0 || checked.length === valCbs.length) {
+        allCb.checked = true;
+        valCbs.forEach(c => c.checked = false);
+        btn.innerHTML = 'All';
+      } else {
+        allCb.checked = false;
+        btn.innerHTML = checked.length + ' selected <span class="badge">' + checked.length + '</span>';
+      }
+      render();
+    }
+
+    allCb.addEventListener('change', () => {
+      if (allCb.checked) { valCbs.forEach(c => c.checked = false); }
+      else { allCb.checked = true; }
+      updateBtn();
+    });
+
+    valCbs.forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) allCb.checked = false;
+        if (!valCbs.some(c => c.checked)) allCb.checked = true;
+        updateBtn();
+      });
+    });
+  });
+
+  document.addEventListener('click', () => {
+    bar.querySelectorAll('.ms-drop.open').forEach(d => d.classList.remove('open'));
+  });
+  bar.querySelectorAll('.ms-drop').forEach(d => {
+    d.addEventListener('click', (e) => e.stopPropagation());
+  });
+
+  // Metric toggle
+  document.querySelectorAll('#metric-bar .opt').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#metric-bar .opt').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      activeMetric = this.dataset.metric;
+      render();
+    });
+  });
+
+  buildStageBar();
+}
+
+function buildStageBar() {
+  const bar = document.getElementById('stage-bar');
+  let html = '<span class="tl">Stages (drag to reorder):</span>';
+  stageOrder.forEach((s, i) => {
+    const chk = s.enabled ? 'checked' : '';
+    const cls = s.enabled ? 'tog' : 'tog disabled-stage';
+    html += '<label class="' + cls + '" draggable="true" data-idx="' + i + '">' +
+      '<input type="checkbox" data-stage="' + s.id + '" ' + chk + '> ' + s.label +
+      '</label>';
+  });
+  bar.innerHTML = html;
+
+  // Checkbox toggle
+  bar.querySelectorAll('input[data-stage]').forEach(cb => {
+    cb.addEventListener('change', function(e) {
+      e.stopPropagation();
+      const s = stageOrder.find(x => x.id === this.dataset.stage);
+      if (s) s.enabled = this.checked;
+      buildStageBar();
+      render();
+    });
+  });
+
+  // Drag and drop
+  let dragIdx = null;
+  const labels = bar.querySelectorAll('label.tog');
+  labels.forEach(lbl => {
+    lbl.addEventListener('dragstart', function(e) {
+      dragIdx = parseInt(this.dataset.idx);
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    lbl.addEventListener('dragend', function() {
+      this.classList.remove('dragging');
+      labels.forEach(l => l.classList.remove('drag-over'));
+      dragIdx = null;
+    });
+    lbl.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.classList.add('drag-over');
+    });
+    lbl.addEventListener('dragleave', function() {
+      this.classList.remove('drag-over');
+    });
+    lbl.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.classList.remove('drag-over');
+      const dropIdx = parseInt(this.dataset.idx);
+      if (dragIdx === null || dragIdx === dropIdx) return;
+      const item = stageOrder.splice(dragIdx, 1)[0];
+      stageOrder.splice(dropIdx, 0, item);
+      buildStageBar();
+      render();
+    });
+  });
+}
+
+function resetFilters() {
+  document.querySelectorAll('.ms').forEach(ms => {
+    const allCb = ms.querySelector('input[data-val="__all__"]');
+    const valCbs = ms.querySelectorAll('input:not([data-val="__all__"])');
+    allCb.checked = true;
+    valCbs.forEach(c => c.checked = false);
+    ms.querySelector('.ms-btn').innerHTML = 'All';
+  });
+  render();
+}
+
+function fmtVal(col, v) {
+  if (col==='if_trial') return v==1?'Trial':'Direct';
+  if (col==='is_reinstall') return v==1?'Reinstall':'First install';
+  if (col==='was_basic_user') return v==1?'Was Basic':'Never Basic';
+  if (col==='subscription_period') return v==='1 mon'?'Monthly':v==='1 year'?'Yearly':v;
+  if (col==='cancelled_30d') return v==1?'Cancelled':'Not cancelled';
+  if (col==='is_retained_next_30d') return v==1?'Retained':'Churned';
+  if (col==='has_rfmc') return v==1?'Has RFMC':'No RFMC';
+  return String(v);
+}
+
+// ================================================================
+// HELPERS
+// ================================================================
+function fmt(n) { return n.toLocaleString(); }
+function pct(a,b) { return b ? ((a/b)*100).toFixed(1) : '0.0'; }
+function cancelRate(users, field) {
+  if (users.length < 10) return null;
+  const f = field || 'cancelled_30d';
+  return users.filter(r=>r[f]===1).length / users.length * 100;
+}
+function retRate(users) {
+  if (users.length < 10) return null;
+  return users.filter(r=>r.is_retained_next_30d===1).length / users.length * 100;
+}
+function medianDaysToCancel(users) {
+  const vals = users.map(r => r.days_to_cancel).filter(v => v !== null).sort((a,b) => a - b);
+  if (vals.length < 5) return null;
+  const mid = Math.floor(vals.length / 2);
+  return vals.length % 2 ? vals[mid] : (vals[mid-1] + vals[mid]) / 2;
+}
+
+// ================================================================
+// STATS BAR
+// ================================================================
+function renderStats() {
+  const d = FILTERED, n = d.length;
+  const bar = document.getElementById('stats-bar');
+  const canc = d.filter(r=>r.cancelled_30d===1);
+  const ret = d.filter(r=>r.is_retained_next_30d===1);
+  const trial = d.filter(r=>r.if_trial===1), direct = d.filter(r=>r.if_trial===0);
+  const cancTrial = trial.filter(r=>r.cancelled_30d===1);
+  const cancDirect = direct.filter(r=>r.cancelled_30d===1);
+  const med = medianDaysToCancel(canc);
+  bar.innerHTML = `
+    <div class="stat"><div class="l">Users (with window)</div><div class="v">${fmt(n)}</div><div class="d">${fmt(trial.length)} trial / ${fmt(direct.length)} direct</div></div>
+    <div class="stat" style="border-color:var(--red)"><div class="l">30d Cancel Rate</div><div class="v" style="color:var(--red)">${n?pct(canc.length,n):'—'}%</div><div class="d">${fmt(canc.length)} cancelled</div></div>
+    <div class="stat"><div class="l">Cancel: Trial vs Direct</div><div class="v">${trial.length?pct(cancTrial.length,trial.length):'—'}% / ${direct.length?pct(cancDirect.length,direct.length):'—'}%</div><div class="d">trial / direct</div></div>
+    <div class="stat"><div class="l">Median Days to Cancel</div><div class="v">${med!==null?med.toFixed(0):'—'}</div><div class="d">among those who cancelled</div></div>
+    <div class="stat"><div class="l">D31-60 Retention</div><div class="v">${n?pct(ret.length,n):'—'}%</div><div class="d">${fmt(ret.length)} retained</div></div>`;
+}
+
+// ================================================================
+// SANKEY BUILDER
+// ================================================================
+function buildSankeyData(data) {
+  const total = data.length;
+  if (!total) return { nodes: [], links: [], stages: [] };
+
+  const stages = stageOrder.filter(s => s.enabled).map(s => s.id);
+  if (stages.length < 2) return { nodes: [], links: [], stages: [] };
+
+  function classify(row, stage) {
+    switch(stage) {
+      case 'plan':       return row.subscription_period === '1 mon' ? 'Monthly' : 'Yearly';
+      case 'basic':      return row.was_basic_user === 1 ? 'Was Basic' : 'Never Basic';
+      case 'trial':      return row.if_trial === 1 ? 'Trial' : 'Direct';
+      case 'eng':
+        if (row.if_trial === 0) return 'Direct (no trial)';
+        return row.trial_engagement_level === 'trial_3+_game_days' ? '3+ game days'
+             : row.trial_engagement_level === 'trial_1-2_game_days' ? '1-2 game days'
+             : '0 game days';
+      case 'w0':         return row.w0_is_active === 1 ? 'W0 Active' : 'W0 Inactive';
+      case 'canc_7d':    return row.cancelled_7d === 1 ? 'Cancelled ≤7d' : 'Not cancelled 7d';
+      case 'canc':       return row.cancelled_30d === 1 ? 'Cancelled' : 'Not cancelled';
+      case 'canc_any':   return row.cancelled_any === 1 ? 'Cancelled (ever)' : 'Never cancelled';
+      case 'canc_time':
+        if (!row.cancel_timing_bucket || row.cancel_timing_bucket === 'not_canceled') return 'Not cancelled';
+        return row.cancel_timing_bucket;
+      case 'ret':        return row.is_retained_next_30d === 1 ? 'Retained' : 'Churned';
+      case 'platform':   return row.platform || 'Unknown';
+      case 'country':    return row.country_group || 'Unknown';
+      case 'age':        return row.child_age_range || 'Unknown';
+      case 'channel':    return row.acquisition_channel || 'Unknown';
+      case 'trigger':    return row.conversion_trigger || 'Unknown';
+      case 'reinstall':  return row.is_reinstall === 1 ? 'Reinstall' : 'First install';
+      case 'rfmc':       return row.rfmc_segment != null && row.rfmc_segment !== '' ? 'RFMC ' + row.rfmc_segment : 'No RFMC';
+      case 'has_rfmc':   return row.has_rfmc === 1 ? 'Has RFMC' : 'No RFMC';
+      case 'history':    return row.subscriber_history || 'Unknown';
+      case 'tenure':     return row.tenure_bucket || 'Unknown';
+      case 'prior_subs': return row.prior_sub_bucket || 'Unknown';
+    }
+    return 'Other';
+  }
+
+  // Color palette for nodes
+  const nodeColorMap = {
+    'plan:Monthly': '#3b82f6', 'plan:Yearly': '#60a5fa',
+    'basic:Was Basic': '#6366f1', 'basic:Never Basic': '#a5b4fc',
+    'trial:Trial': '#9333ea', 'trial:Direct': '#22c55e',
+    'eng:3+ game days': '#7c3aed', 'eng:1-2 game days': '#a78bfa', 'eng:0 game days': '#c4b5fd',
+    'eng:Direct (no trial)': '#4ade80',
+    'w0:W0 Active': '#16a34a', 'w0:W0 Inactive': '#94a3b8',
+    'canc_7d:Cancelled ≤7d': '#ef4444', 'canc_7d:Not cancelled 7d': '#22c55e',
+    'canc:Cancelled': '#ef4444', 'canc:Not cancelled': '#22c55e',
+    'canc_any:Cancelled (ever)': '#ef4444', 'canc_any:Never cancelled': '#22c55e',
+    'canc_time:Not cancelled': '#22c55e', 'canc_time:before_payment': '#fbbf24',
+    'canc_time:w0': '#f97316', 'canc_time:w1': '#ef4444', 'canc_time:w2_w4': '#dc2626', 'canc_time:after_30d': '#991b1b',
+    'ret:Retained': '#16a34a', 'ret:Churned': '#ef4444',
+    'platform:apple': '#1e293b', 'platform:google': '#22c55e',
+    'country:US': '#3b82f6', 'country:Non-US': '#f59e0b',
+    'reinstall:Reinstall': '#f59e0b', 'reinstall:First install': '#3b82f6',
+    'has_rfmc:Has RFMC': '#7c3aed', 'has_rfmc:No RFMC': '#94a3b8',
+    'rfmc:No RFMC': '#94a3b8', 'rfmc:RFMC 1': '#c4b5fd', 'rfmc:RFMC 2': '#a78bfa',
+    'rfmc:RFMC 3': '#8b5cf6', 'rfmc:RFMC 4': '#7c3aed', 'rfmc:RFMC 5': '#6d28d9',
+    'history:new_subscriber': '#3b82f6', 'history:basic_upgrade': '#f59e0b', 'history:returning_subscriber': '#7c3aed',
+    'trigger:onboarding': '#3b82f6', 'trigger:non_onboarding': '#f59e0b', 'trigger:unknown': '#94a3b8',
+  };
+  // Generate colors for age and tenure dynamically
+  const ageColors = { '2-3': '#ec4899', '4-6': '#8b5cf6', '7-8': '#06b6d4' };
+  Object.entries(ageColors).forEach(([k,v]) => { nodeColorMap['age:' + k] = v; });
+  const tenureColors = { 'd0': '#ef4444', 'd1-d6': '#f97316', 'd7-d30': '#f59e0b', 'd31-d180': '#3b82f6', 'd181+': '#16a34a', 'unknown': '#94a3b8' };
+  Object.entries(tenureColors).forEach(([k,v]) => { nodeColorMap['tenure:' + k] = v; });
+  const channelColors = { 'unattributed': '#94a3b8', 'organic': '#16a34a', 'asa': '#3b82f6', 'meta': '#6366f1', 'ad_network': '#f59e0b' };
+  Object.entries(channelColors).forEach(([k,v]) => { nodeColorMap['channel:' + k] = v; });
+  const priorColors = { 'First sub': '#3b82f6', '1 prior': '#f59e0b', '2-3 prior': '#ef4444', '4+ prior': '#7c3aed' };
+  Object.entries(priorColors).forEach(([k,v]) => { nodeColorMap['prior_subs:' + k] = v; });
+
+  const linkMap = {};
+  const nodeUsers = {};
+
+  data.forEach(row => {
+    const path = stages.map(s => classify(row, s));
+    stages.forEach((s, i) => {
+      const key = s + ':' + path[i];
+      if (!nodeUsers[key]) nodeUsers[key] = [];
+      nodeUsers[key].push(row);
+    });
+    for (let i = 0; i < stages.length - 1; i++) {
+      const fromKey = stages[i] + ':' + path[i];
+      const toKey = stages[i+1] + ':' + path[i+1];
+      const linkKey = fromKey + '|' + toKey;
+      linkMap[linkKey] = (linkMap[linkKey] || 0) + 1;
+    }
+  });
+
+  const nodes = [];
+  const seen = new Set();
+  stages.forEach(s => {
+    Object.keys(nodeUsers).forEach(key => {
+      if (!key.startsWith(s + ':')) return;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const val = key.slice(s.length + 1);
+      const users = nodeUsers[key];
+      const cr = cancelRate(users);
+      const rr = retRate(users);
+      const med = medianDaysToCancel(users.filter(r => r.cancelled_30d === 1));
+      const crStr = cr !== null ? cr.toFixed(0) + '%' : '-';
+      const rrStr = rr !== null ? rr.toFixed(0) + '%' : '-';
+      const medStr = med !== null ? med.toFixed(0) + 'd' : '-';
+      nodes.push({
+        id: key,
+        name: val,
+        color: nodeColorMap[key] || '#64748b',
+        custom: { count: users.length, canc: crStr, ret: rrStr, medCanc: medStr, cancRaw: cr, retRaw: rr },
+      });
+    });
+  });
+
+  const links = Object.entries(linkMap).map(([key, weight]) => {
+    const [from, to] = key.split('|');
+    return [from, to, weight];
+  });
+
+  const stageLabels = {
+    plan: 'Plan', basic: 'Was Basic?', trial: 'Trial Path',
+    eng: 'Trial Engagement', w0: 'W0 Activation',
+    canc_7d: 'Cancelled 7d', canc: 'Cancelled 30d', canc_any: 'Cancelled (any)', canc_time: 'Cancel Timing', ret: 'Retention',
+    platform: 'Platform', country: 'Country', age: 'Child Age',
+    channel: 'Acq Channel', trigger: 'Conv Trigger', reinstall: 'Reinstall',
+    rfmc: 'RFMC Segment', has_rfmc: 'Has RFMC',
+    history: 'Sub History', tenure: 'Tenure', prior_subs: 'Prior Subs',
+  };
+  const activeStageNames = stages.map(s => stageLabels[s] || s);
+
+  return { nodes, links, stages: activeStageNames };
+}
+
+// ================================================================
+// RENDER
+// ================================================================
+function renderSankey(containerId, data, chartHeight) {
+  const container = document.getElementById(containerId);
+  if (!container) { console.error('Container not found:', containerId); return; }
+
+  const { nodes, links, stages } = buildSankeyData(data);
+  if (!links.length) {
+    container.innerHTML = '<p style="color:var(--muted);padding:40px;text-align:center">No data for current filters. Enable at least 2 stages.</p>';
+    return;
+  }
+
+  // Choose what to show in node labels based on active metric
+  function nodeMetricLabel(c) {
+    if (activeMetric === 'cancel_30d') return 'canc ' + (c.canc || '-');
+    if (activeMetric === 'cancel_timing') return 'med ' + (c.medCanc || '-');
+    if (activeMetric === 'retention') return 'ret ' + (c.ret || '-');
+    return 'canc ' + (c.canc || '-');
+  }
+
+  try {
+    Highcharts.chart(container, {
+      chart: {
+        height: chartHeight || 600,
+        backgroundColor: 'transparent',
+        spacing: [30, 10, 10, 10],
+        events: {
+          render: function() {
+            const ch = this;
+            (ch._stageLabels || []).forEach(l => l.destroy());
+            ch._stageLabels = [];
+            const series = ch.series[0];
+            if (!series || !series.nodes) return;
+            const colMap = {};
+            series.nodes.forEach(n => {
+              if (n.graphic) {
+                const x = n.nodeX != null ? ch.plotLeft + n.nodeX + 10 : null;
+                const col = n.column != null ? n.column : null;
+                if (col !== null && x !== null) {
+                  if (!colMap[col] || x < colMap[col]) colMap[col] = x;
+                }
+              }
+            });
+            const cols = Object.keys(colMap).map(Number).sort((a,b) => a - b);
+            cols.forEach((col, i) => {
+              if (i < stages.length) {
+                const lbl = ch.renderer.text(
+                  stages[i], colMap[col], 18
+                ).css({
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  color: '#64748b',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }).add();
+                ch._stageLabels.push(lbl);
+              }
+            });
+          }
+        },
+      },
+      title: { text: null },
+      credits: { enabled: false },
+      tooltip: {
+        useHTML: true,
+        nodeFormatter: function() {
+          const c = this.point.custom || {};
+          return '<b>' + this.point.name + '</b><br/>' +
+            'Users: <b>' + fmt(c.count || this.point.sum) + '</b><br/>' +
+            '30d Cancel Rate: <b>' + (c.canc || '-') + '</b><br/>' +
+            'Median Days to Cancel: <b>' + (c.medCanc || '-') + '</b><br/>' +
+            'D31-60 Retention: <b>' + (c.ret || '-') + '</b>';
+        },
+        pointFormat: '{point.fromNode.name} &rarr; {point.toNode.name}<br/><b>{point.weight:,.0f}</b> users',
+      },
+      plotOptions: {
+        sankey: {
+          states: { hover: { enabled: false }, inactive: { enabled: false } },
+          point: {
+            events: {
+              click: function() {
+                const pt = this;
+                const chart = pt.series.chart;
+                const series = pt.series;
+                const node = pt.isNode ? pt : (pt.toNode || null);
+                if (!node) return;
+                const allLinks = series.points.filter(p => p.fromNode && p.toNode);
+                const downMap = {}, upMap = {};
+                allLinks.forEach(link => {
+                  const fid = link.fromNode.id, tid = link.toNode.id;
+                  if (!downMap[fid]) downMap[fid] = [];
+                  downMap[fid].push({ link, node: link.toNode });
+                  if (!upMap[tid]) upMap[tid] = [];
+                  upMap[tid].push({ link, node: link.fromNode });
+                });
+                const pathLinkSet = new Set(), pathNodeSet = new Set();
+                pathNodeSet.add(node.id);
+                function traceDown(nid) {
+                  (downMap[nid] || []).forEach(({ link, node: n }) => {
+                    if (pathLinkSet.has(link.index)) return;
+                    pathLinkSet.add(link.index); pathNodeSet.add(n.id);
+                    traceDown(n.id);
+                  });
+                }
+                function traceUp(nid) {
+                  (upMap[nid] || []).forEach(({ link, node: n }) => {
+                    if (pathLinkSet.has(link.index)) return;
+                    pathLinkSet.add(link.index); pathNodeSet.add(n.id);
+                    traceUp(n.id);
+                  });
+                }
+                traceDown(node.id); traceUp(node.id);
+                const alreadyActive = chart._activeNode === node.id;
+                chart._activeNode = alreadyActive ? null : node.id;
+                allLinks.forEach(link => {
+                  if (link.graphic && link.graphic.element) {
+                    link.graphic.element.style.opacity = alreadyActive ? '' : (pathLinkSet.has(link.index) ? '0.7' : '0.04');
+                  }
+                });
+                series.nodes.forEach(n => {
+                  const inPath = alreadyActive || pathNodeSet.has(n.id);
+                  if (n.graphic && n.graphic.element) n.graphic.element.style.opacity = inPath ? '' : '0.15';
+                  if (n.dataLabel && n.dataLabel.element) n.dataLabel.element.style.opacity = inPath ? '' : '0.15';
+                });
+              }
+            }
+          }
+        }
+      },
+      series: [{
+        type: 'sankey',
+        name: 'Cancellation Flow',
+        keys: ['from', 'to', 'weight'],
+        nodes: nodes,
+        data: links,
+        colorByPoint: true,
+        nodeWidth: 20,
+        nodePadding: 14,
+        curveFactor: 0.5,
+        linkOpacity: 0.35,
+        dataLabels: {
+          enabled: true,
+          useHTML: true,
+          style: { color: '#1e293b', textOutline: 'none', fontSize: '11px' },
+          nodeFormatter: function() {
+            const c = this.point.custom || {};
+            const n = fmt(c.count || 0);
+            const metric = nodeMetricLabel(c);
+            return '<div style="color:#1e293b;text-shadow:0 0 3px #fff,0 0 3px #fff">' +
+              '<b>' + this.point.name + '</b>' +
+              '<br/><span style="font-size:9px;color:#475569">' + n + ' · ' + metric + '</span></div>';
+          },
+        },
+      }],
+    });
+  } catch(e) {
+    console.error('Highcharts error:', e);
+    container.innerHTML = '<p style="color:red;padding:20px">Chart error: ' + e.message + '</p>';
+  }
+}
+
+function render() {
+  const activeFilters = {};
+  document.querySelectorAll('.ms').forEach(ms => {
+    const col = ms.dataset.col;
+    const allCb = ms.querySelector('input[data-val="__all__"]');
+    if (allCb && allCb.checked) return;
+    const checked = [...ms.querySelectorAll('input:not([data-val="__all__"]):checked')];
+    if (checked.length > 0) {
+      activeFilters[col] = checked.map(c => c.dataset.val);
+    }
+  });
+  FILTERED = RAW.filter(r => {
+    if (!r.has_retention_window) return false;
+    for (const [c, vals] of Object.entries(activeFilters)) {
+      if (!vals.includes(String(r[c]))) return false;
+    }
+    return true;
+  });
+
+  const parts = Object.entries(activeFilters).map(([c, vals]) => {
+    const f = FILTERS.find(x => x.col === c);
+    const label = f ? f.label : c;
+    const display = vals.length <= 2 ? vals.map(v => fmtVal(c, v)).join(', ') : vals.length + ' selected';
+    return `${label}=${display}`;
+  });
+  document.getElementById('filter-summary').textContent = parts.length ? 'Filtered: ' + parts.join(' | ') : '';
+
+  renderStats();
+
+  const cmpCol = document.getElementById('cmp-select').value;
+  const wrap = document.querySelector('.chart-wrap');
+
+  if (cmpCol === '__none__') {
+    wrap.innerHTML = '<div class="chart-card"><div id="sankey-0" style="min-height:550px"></div></div>';
+    requestAnimationFrame(() => renderSankey('sankey-0', FILTERED, 550));
+  } else {
+    const vals = [...new Set(FILTERED.map(r => r[cmpCol]))].filter(v => v != null && v !== '').sort();
+    let html = '<div class="compare-grid">';
+    vals.forEach((v, i) => {
+      html += '<div class="compare-panel"><div class="chart-card">' +
+        '<h4 style="color:' + PALETTE[i % PALETTE.length] + '">' + fmtVal(cmpCol, v) + ' (n=' + fmt(FILTERED.filter(r => String(r[cmpCol]) === String(v)).length) + ')</h4>' +
+        '<div id="sankey-' + i + '" style="min-height:500px"></div></div></div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+    requestAnimationFrame(() => {
+      vals.forEach((v, i) => {
+        const subset = FILTERED.filter(r => String(r[cmpCol]) === String(v));
+        renderSankey('sankey-' + i, subset, 500);
+      });
+    });
+  }
+
+  renderDrivers();
+  renderHeatmap();
+}
+
+// ================================================================
+// SEGMENT IMPORTANCE (LR-based)
+// ================================================================
+function renderDrivers() {
+  // Pre-computed from logistic regression on full cohort (172.3K users)
+  // n = segment size (users with that flag=1), pct = n/172315
+  const TOTAL = 172315;
+  const drivers = [
+    { feature: 'Google (vs Apple)',         or: 0.507, coef: 0.6798, dim: 'Platform',         dir: 'less', n: 32809 },
+    { feature: 'Returning subscriber',      or: 1.642, coef: 0.4957, dim: 'Sub History',      dir: 'more', n: 26509 },
+    { feature: 'Conv trigger: unknown',     or: 0.578, coef: 0.5485, dim: 'Conv Trigger',     dir: 'less', n: 12973 },
+    { feature: 'Trial user (vs Direct)',    or: 1.512, coef: 0.4136, dim: 'Trial/Direct',     dir: 'more', n: 106081 },
+    { feature: 'Yearly plan (vs Monthly)',  or: 0.687, coef: 0.3754, dim: 'Plan',             dir: 'less', n: 77921 },
+    { feature: 'Conv trigger: onboarding',  or: 0.724, coef: 0.3233, dim: 'Conv Trigger',     dir: 'less', n: 60685 },
+    { feature: 'W0 Active',                 or: 0.731, coef: 0.3139, dim: 'W0 Activation',    dir: 'less', n: 122948 },
+    { feature: 'Tenure d1-d6',              or: 0.748, coef: 0.2899, dim: 'Tenure',           dir: 'less', n: 11384 },
+    { feature: 'Trial 0 game days',         or: 1.306, coef: 0.2669, dim: 'Trial Engagement', dir: 'more', n: 19625 },
+    { feature: 'Trial 1-2 game days',       or: 1.282, coef: 0.2480, dim: 'Trial Engagement', dir: 'more', n: 35289 },
+    { feature: 'Tenure d7-d30',             or: 0.806, coef: 0.2158, dim: 'Tenure',           dir: 'less', n: 90579 },
+    { feature: 'Has RFMC',                  or: 0.833, coef: 0.1830, dim: 'Has RFMC',         dir: 'less', n: 57146 },
+    { feature: 'New subscriber',            or: 1.128, coef: 0.1208, dim: 'Sub History',      dir: 'more', n: 78797 },
+  ];
+  drivers.forEach(d => { d.pct = d.n / TOTAL * 100; d.impact = Math.abs(Math.log(d.or)) * d.pct; });
+
+  // Sort by population impact (|log(OR)| × segment %)
+  const sorted = [...drivers].sort((a, b) => b.impact - a.impact);
+
+  try {
+    Highcharts.chart('drivers-chart', {
+      chart: { type: 'bar', backgroundColor: 'transparent', height: Math.max(340, sorted.length * 32 + 80) },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: {
+        categories: sorted.map(d => d.feature),
+        labels: { style: { fontSize: '11px', fontWeight: '600' } },
+      },
+      yAxis: {
+        title: { text: 'Odds Ratio' },
+        min: 0.4, max: 1.8,
+        plotLines: [{ value: 1.0, color: '#475569', width: 2, dashStyle: 'Dash', label: { text: 'OR = 1 (no effect)', style: { fontSize: '9px', color: '#94a3b8' } } }],
+        labels: { format: '{value:.1f}' },
+      },
+      tooltip: {
+        useHTML: true,
+        formatter: function() {
+          const d = sorted[this.point.index];
+          return '<b>' + d.feature + '</b><br/>' +
+            'Dimension: ' + d.dim + '<br/>' +
+            'Odds Ratio: <b>' + d.or.toFixed(3) + '</b><br/>' +
+            'Segment: <b>' + (d.n/1000).toFixed(1) + 'K</b> (' + d.pct.toFixed(1) + '% of cohort)<br/>' +
+            (d.dir === 'more' ? '<span style="color:#ef4444">Increases cancellation</span>' : '<span style="color:#16a34a">Decreases cancellation</span>');
+        }
+      },
+      legend: { enabled: false },
+      plotOptions: { columnrange: { borderWidth: 0, borderRadius: 3 } },
+      series: [{
+        name: 'Odds Ratio',
+        data: sorted.map(d => ({
+          low: Math.min(1, d.or),
+          high: Math.max(1, d.or),
+          color: d.dir === 'more' ? '#ef4444' : '#16a34a',
+        })),
+        type: 'columnrange',
+        pointWidth: 14,
+        dataLabels: {
+          enabled: true,
+          inside: false,
+          formatter: function() {
+            const d = sorted[this.point.index];
+            // Show label only at the OR end (high for >1, low for <1)
+            const diff = d.or - 1;
+            const label = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+            if (d.or > 1 && this.y === this.point.high) return label;
+            if (d.or < 1 && this.y === this.point.low) return label;
+            return '';
+          },
+          style: { fontSize: '10px', textOutline: 'none', fontWeight: '600' },
+        },
+      }],
+    });
+  } catch(e) { console.error('Drivers chart error:', e); }
+
+  // Scatterplot: Segment Size (x) vs Odds Ratio (y) — prioritization matrix
+  try {
+    const scatterData = drivers.map(d => ({
+      x: d.pct,
+      y: d.or,
+      name: d.feature,
+      n: d.n,
+      dim: d.dim,
+      dir: d.dir,
+      marker: { fillColor: d.dir === 'more' ? '#ef4444' : '#16a34a' }
+    }));
+    Highcharts.chart('drivers-scatter', {
+      chart: { type: 'scatter', backgroundColor: 'transparent', height: 380 },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: {
+        title: { text: 'Segment Size (% of cohort)', style: { fontSize: '11px', fontWeight: '600' } },
+        min: 0, max: 80,
+        gridLineWidth: 1, gridLineColor: '#f1f5f9',
+        labels: { format: '{value}%' },
+      },
+      yAxis: {
+        title: { text: 'Odds Ratio (effect on cancellation)', style: { fontSize: '11px', fontWeight: '600' } },
+        min: 0.4, max: 1.8,
+        plotLines: [{ value: 1.0, color: '#475569', width: 2, dashStyle: 'Dash', zIndex: 3 }],
+        plotBands: [
+          { from: 1.0, to: 1.8, color: 'rgba(239,68,68,0.04)', label: { text: 'Increases cancellation', align: 'left', x: 6, style: { fontSize: '9px', color: '#94a3b8' } } },
+          { from: 0.4, to: 1.0, color: 'rgba(22,163,106,0.04)', label: { text: 'Decreases cancellation', align: 'left', x: 6, style: { fontSize: '9px', color: '#94a3b8' } } },
+        ],
+        labels: { format: '{value:.1f}' },
+      },
+      tooltip: {
+        useHTML: true,
+        formatter: function() {
+          const p = this.point;
+          return '<b>' + p.name + '</b><br/>' +
+            'Segment: <b>' + (p.n/1000).toFixed(1) + 'K</b> (' + p.x.toFixed(1) + '%)<br/>' +
+            'Odds Ratio: <b>' + p.y.toFixed(3) + '</b><br/>' +
+            (p.dir === 'more'
+              ? '<span style="color:#ef4444">+' + ((p.y-1)*100).toFixed(0) + '% more likely to cancel</span>'
+              : '<span style="color:#16a34a">-' + ((1-p.y)*100).toFixed(0) + '% less likely to cancel</span>');
+        }
+      },
+      legend: { enabled: false },
+      plotOptions: {
+        scatter: {
+          marker: { radius: 7, lineWidth: 1.5, lineColor: '#fff', symbol: 'circle' },
+          dataLabels: {
+            enabled: true,
+            formatter: function() {
+              const diff = this.point.y - 1;
+              return (diff >= 0 ? '+' : '') + diff.toFixed(2);
+            },
+            style: { fontSize: '10px', textOutline: '2px white', fontWeight: '700' },
+            y: -12,
+          },
+        }
+      },
+      series: [{ name: 'Segments', data: scatterData }],
+    });
+  } catch(e) { console.error('Drivers scatter error:', e); }
+
+  // Drivers table — sorted by population impact, with Segment Size column
+  const maxPct = Math.max(...sorted.map(d => d.pct));
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+    '<thead><tr style="border-bottom:2px solid var(--border);text-align:left;">' +
+    '<th style="padding:6px 8px;width:30px;">#</th>' +
+    '<th style="padding:6px 8px;">Feature</th>' +
+    '<th style="padding:6px 8px;">Dimension</th>' +
+    '<th style="padding:6px 8px;">Odds Ratio</th>' +
+    '<th style="padding:6px 8px;">Interpretation</th>' +
+    '<th style="padding:6px 8px;width:180px;">Segment Size</th>' +
+    '</tr></thead><tbody>';
+
+  sorted.forEach((d, i) => {
+    const bg = i % 2 === 0 ? '#fff' : '#f8fafc';
+    const effectColor = d.dir === 'more' ? 'var(--red)' : 'var(--green)';
+    const pctChange = d.dir === 'more'
+      ? '+' + ((d.or - 1) * 100).toFixed(0) + '% more likely to cancel'
+      : '-' + ((1 - d.or) * 100).toFixed(0) + '% less likely to cancel';
+    const barWidth = (d.pct / maxPct * 100).toFixed(1);
+    html += '<tr style="background:' + bg + ';border-bottom:1px solid var(--border);">' +
+      '<td style="padding:6px 8px;font-weight:700;color:var(--muted);">' + (i + 1) + '</td>' +
+      '<td style="padding:6px 8px;font-weight:600;">' + d.feature + '</td>' +
+      '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + d.dim + '</td>' +
+      '<td style="padding:6px 8px;font-weight:700;">' + d.or.toFixed(3) + '</td>' +
+      '<td style="padding:6px 8px;color:' + effectColor + ';font-size:11px;">' + pctChange + '</td>' +
+      '<td style="padding:6px 8px;">' +
+        '<div style="display:flex;align-items:center;gap:6px;">' +
+          '<div style="flex:1;height:12px;background:#f1f5f9;border-radius:3px;overflow:hidden;">' +
+            '<div style="width:' + barWidth + '%;height:100%;background:#94a3b8;border-radius:3px;"></div>' +
+          '</div>' +
+          '<span style="font-size:10px;color:var(--muted);white-space:nowrap;">' + (d.n/1000).toFixed(1) + 'K (' + d.pct.toFixed(0) + '%)</span>' +
+        '</div>' +
+      '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('drivers-table').innerHTML = html;
+}
+
+// ================================================================
+// CORRELATION HEATMAP
+// ================================================================
+function renderHeatmap() {
+  const labels = ['Platform','Trial Eng','Acq Channel','W0 Activation','Sub History','Conv Trigger',
+    'Trial/Direct','Was Basic','Has RFMC','Child Age','Plan','Tenure','Country','Reinstall','Cancelled 30d'];
+
+  // Pre-computed Cramér's V matrix (15×15)
+  const matrix = [
+    [1.000,0.063,0.081,0.002,0.057,0.035,0.045,0.042,0.004,0.035,0.058,0.106,0.219,0.052,0.118],
+    [0.063,1.000,0.032,0.549,0.358,0.416,1.000,0.471,0.437,0.045,0.254,0.358,0.231,0.170,0.127],
+    [0.081,0.032,1.000,0.038,0.015,0.014,0.026,0.021,0.014,0.031,0.043,0.019,0.079,0.031,0.034],
+    [0.002,0.549,0.038,1.000,0.299,0.345,0.374,0.311,0.268,0.060,0.045,0.219,0.073,0.160,0.110],
+    [0.057,0.358,0.015,0.299,1.000,0.468,0.497,0.939,0.650,0.053,0.128,0.425,0.094,0.295,0.103],
+    [0.035,0.416,0.014,0.345,0.468,1.000,0.561,0.635,0.529,0.066,0.117,0.483,0.055,0.269,0.063],
+    [0.045,1.000,0.026,0.374,0.497,0.561,1.000,0.461,0.434,0.051,0.250,0.575,0.231,0.161,0.083],
+    [0.042,0.471,0.021,0.311,0.939,0.635,0.461,1.000,0.642,0.065,0.081,0.606,0.079,0.289,0.082],
+    [0.004,0.437,0.014,0.268,0.650,0.529,0.434,0.642,1.000,0.055,0.061,0.618,0.057,0.267,0.069],
+    [0.035,0.045,0.031,0.060,0.053,0.066,0.051,0.065,0.055,1.000,0.062,0.115,0.084,0.082,0.012],
+    [0.058,0.254,0.043,0.045,0.128,0.117,0.250,0.081,0.061,0.062,1.000,0.140,0.004,0.058,0.069],
+    [0.106,0.358,0.019,0.219,0.425,0.483,0.575,0.606,0.618,0.115,0.140,1.000,0.111,0.416,0.045],
+    [0.219,0.231,0.079,0.073,0.094,0.055,0.231,0.079,0.057,0.084,0.004,0.111,1.000,0.025,0.038],
+    [0.052,0.170,0.031,0.160,0.295,0.269,0.161,0.289,0.267,0.082,0.058,0.416,0.025,1.000,0.021],
+    [0.118,0.127,0.034,0.110,0.103,0.063,0.083,0.082,0.069,0.012,0.069,0.045,0.038,0.021,1.000],
+  ];
+
+  const heatData = [];
+  for (let i = 0; i < labels.length; i++) {
+    for (let j = 0; j < labels.length; j++) {
+      heatData.push([j, i, matrix[i][j]]);
+    }
+  }
+
+  try {
+    Highcharts.chart('heatmap-chart', {
+      chart: { type: 'heatmap', backgroundColor: 'transparent', height: 520, marginBottom: 120 },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: {
+        categories: labels,
+        labels: { rotation: -45, style: { fontSize: '10px', fontWeight: '600' } },
+        opposite: true,
+      },
+      yAxis: {
+        categories: labels,
+        labels: { style: { fontSize: '10px', fontWeight: '600' } },
+        reversed: true,
+        title: null,
+      },
+      colorAxis: {
+        min: 0, max: 1,
+        stops: [
+          [0, '#ffffff'],
+          [0.05, '#f0f9ff'],
+          [0.15, '#bfdbfe'],
+          [0.3, '#60a5fa'],
+          [0.5, '#f59e0b'],
+          [0.7, '#ef4444'],
+          [1.0, '#991b1b'],
+        ],
+        labels: { format: '{value:.1f}' },
+      },
+      legend: {
+        align: 'center', verticalAlign: 'bottom',
+        symbolWidth: 280, symbolHeight: 10,
+        title: { text: 'Cramér\'s V (0 = independent, 1 = perfectly associated)', style: { fontSize: '10px', fontWeight: '400' } },
+      },
+      tooltip: {
+        useHTML: true,
+        formatter: function() {
+          const x = labels[this.point.x];
+          const y = labels[this.point.y];
+          const v = this.point.value;
+          let interpretation = v >= 0.6 ? 'Very strong — likely confounders' : v >= 0.3 ? 'Moderate — partial overlap' : v >= 0.1 ? 'Weak association' : 'Near independent';
+          return '<b>' + y + '</b> × <b>' + x + '</b><br/>' +
+            'Cramér\'s V: <b>' + v.toFixed(4) + '</b><br/>' +
+            '<span style="color:#64748b">' + interpretation + '</span>';
+        }
+      },
+      series: [{
+        name: 'Cramér\'s V',
+        data: heatData,
+        borderWidth: 1,
+        borderColor: '#ffffff',
+        dataLabels: {
+          enabled: true,
+          formatter: function() {
+            if (this.point.x === this.point.y) return '';
+            return this.point.value >= 0.3 ? this.point.value.toFixed(2) : '';
+          },
+          style: { fontSize: '8px', textOutline: 'none', color: '#1e293b', fontWeight: '600' },
+        },
+      }],
+    });
+  } catch(e) { console.error('Heatmap error:', e); }
+}
+</script>
+</body>
+</html>

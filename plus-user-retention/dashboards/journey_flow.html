@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plus User Journey Flow</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root { --blue:#3b82f6; --green:#16a34a; --orange:#f59e0b; --red:#ef4444; --purple:#7c3aed;
+  --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+.header { background:linear-gradient(135deg,#3b82f6 0%,#7c3aed 100%); padding:18px 24px; color:#fff; }
+.header h1 { font-size:18px; font-weight:700; }
+.header .sub { font-size:12px; color:rgba(255,255,255,.7); margin-top:2px; }
+#filter-summary { font-size:11px; color:rgba(255,255,255,.9); margin-top:4px; font-weight:500; }
+.controls { background:var(--card); border-bottom:1px solid var(--border); padding:10px 24px; display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+.ctrl { display:flex; flex-direction:column; gap:1px; }
+.ctrl label { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.ctrl select { font-size:12px; padding:3px 6px; border:1px solid var(--border); border-radius:4px; background:#fff; min-width:100px; }
+.sep { width:1px; background:var(--border); align-self:stretch; margin:0 4px; }
+#file-upload { padding:40px; text-align:center; }
+.drop-zone { border:2px dashed var(--border); border-radius:12px; padding:40px; cursor:pointer; }
+.drop-zone:hover { border-color:var(--blue); }
+.hidden { display:none; }
+.flow-wrap { padding:14px 24px; }
+.flow-card { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.stage-headers { display:flex; padding:0 16px; gap:0; border-bottom:1px solid var(--border); background:#f8fafc; }
+.stage-header { flex:1; text-align:center; padding:6px 4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); border-left:1px solid var(--border); }
+.stage-header:first-child { border-left:none; }
+.flow-body { overflow-x:auto; padding:24px 16px; min-height:300px; }
+.flow-body svg { max-width:none; }
+.legend { display:flex; gap:20px; padding:12px 24px; flex-wrap:wrap; align-items:center; }
+.legend-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text); }
+.legend-swatch { width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.1); }
+.stats-row { display:flex; gap:12px; padding:14px 24px; flex-wrap:wrap; }
+.stat { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 14px; flex:1; min-width:120px; }
+.stat .l { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.stat .v { font-size:22px; font-weight:700; margin-top:2px; }
+.stat .d { font-size:11px; color:var(--muted); margin-top:1px; }
+.note { font-size:11px; color:var(--muted); padding:0 24px 14px; }
+.toggles { background:var(--card); border-bottom:1px solid var(--border); padding:8px 24px; display:flex; gap:16px; align-items:center; }
+.toggles .tl { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.tog { display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; user-select:none; }
+.tog input { accent-color:var(--blue); }
+.compare-grid { display:flex; gap:16px; overflow-x:auto; }
+.compare-panel { flex:1; min-width:400px; }
+.compare-panel .flow-card { height:100%; }
+.compare-panel h4 { font-size:12px; font-weight:700; text-align:center; padding:8px 12px; margin:0; border-bottom:1px solid var(--border); }
+.ctrl.compare { border:2px solid var(--blue); border-radius:6px; padding:4px 8px; background:#eff6ff; }
+.ctrl.compare label { color:var(--blue); }
+/* Flatten mermaid nodes — compact height, keep width */
+.flow-body .node .label { padding:2px 8px !important; }
+.flow-body .node rect { rx:4; ry:4; }
+.flow-body .nodeLabel { line-height:1.15; padding:1px 0; }
+.flow-body .nodeLabel p { margin:0; }
+.flow-body .edgeLabel { font-size:9px; }
+.flow-body .node foreignObject { overflow:visible; }
+.flow-body .node foreignObject > div { padding:2px 6px !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Plus User Journey Flow</h1>
+  <div class="sub">Plan &rarr; Was Basic? &rarr; Trial path &rarr; Trial engagement &rarr; W0 Activation &rarr; D31-60 Retention</div>
+  <div id="filter-summary"></div>
+</div>
+
+<div id="file-upload">
+  <div class="drop-zone" id="drop-zone">
+    <p style="font-size:28px">&#128194;</p>
+    <p style="font-weight:600;font-size:15px;margin:8px 0">Load journey data</p>
+    <p style="color:var(--muted);font-size:12px">
+      <code>SELECT * FROM sandbox.lingokids_tammyliang_content.plus_user_retention WHERE journey_day = 0</code><br>
+      Drop CSV or click to upload
+    </p>
+    <p style="color:var(--muted);font-size:11px;margin-top:8px">
+      Or save CSV as <code>journey_data.csv</code> in this folder &mdash; auto-loads on refresh.
+    </p>
+    <input type="file" id="csv-input" accept=".csv" style="display:none">
+  </div>
+</div>
+
+<div id="dashboard" class="hidden">
+  <div class="controls" id="controls-bar"></div>
+  <div class="stats-row" id="stats-bar"></div>
+  <div class="toggles">
+    <span class="tl">Show levels:</span>
+    <label class="tog"><input type="checkbox" id="tog-basic" checked> Was Basic</label>
+    <label class="tog"><input type="checkbox" id="tog-trial" checked> Trial/Direct</label>
+    <label class="tog"><input type="checkbox" id="tog-eng" checked> Trial Engagement</label>
+    <label class="tog"><input type="checkbox" id="tog-w0" checked> W0 Activation</label>
+    <label class="tog"><input type="checkbox" id="tog-ret" checked> Retained/Churned</label>
+  </div>
+  <div class="flow-wrap">
+    <div class="flow-card">
+      <div id="flow-body" class="flow-body"></div>
+    </div>
+  </div>
+  <div class="legend">
+    <span class="legend-title">Retention:</span>
+    <div class="legend-item"><div class="legend-swatch" style="background:#dcfce7;border-color:#166534"></div> &ge;50%</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fef3c7;border-color:#92400e"></div> 30&ndash;49%</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fee2e2;border-color:#991b1b"></div> &lt;30%</div>
+    <span class="sep"></span>
+    <span class="legend-title">Churn magnitude:</span>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fca5a5;border-color:#991b1b;border-width:3px"></div> Largest</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fecaca;border-color:#b91c1c;border-width:2px"></div> Medium</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fee2e2;border-color:#991b1b"></div> Smaller</div>
+    <span class="sep"></span>
+    <span class="legend-title">Stages:</span>
+    <div class="legend-item"><div class="legend-swatch" style="background:#dbeafe;border-color:#3b82f6"></div> Plan</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#e0e7ff;border-color:#6366f1"></div> Basic history</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#f3e8ff;border-color:#9333ea"></div> Trial</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#faf5ff;border-color:#a855f7"></div> Engagement</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#f0fdf4;border-color:#22c55e"></div> Direct</div>
+  </div>
+  <div class="note">All nodes show user count, % of parent, D31-60 retention rate, and 30-day cancellation rate. Churn nodes are color-coded by magnitude — darker red = more churned users relative to other groups. Only users with retention window included.</div>
+</div>
+
+<script>
+// ================================================================
+// INIT
+// ================================================================
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  themeVariables: {
+    primaryColor: '#dbeafe',
+    primaryBorderColor: '#3b82f6',
+    primaryTextColor: '#1e293b',
+    lineColor: '#94a3b8',
+    fontSize: '11px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+  },
+  flowchart: {
+    htmlLabels: true,
+    curve: 'basis',
+    nodeSpacing: 8,
+    rankSpacing: 40,
+    padding: 4,
+  },
+  securityLevel: 'loose',
+});
+
+let RAW = [], FILTERED = [];
+let renderCounter = 0;
+
+const FILTERS = [
+  {col:'subscription_period',label:'Plan'},
+  {col:'if_trial',label:'Trial'},
+  {col:'platform',label:'Platform'},
+  {col:'country_group',label:'Country'},
+  {col:'rfmc_segment',label:'RFMC'},
+  {col:'conversion_trigger',label:'Trigger'},
+  {col:'is_reinstall',label:'Reinstall'},
+  {col:'was_basic_user',label:'Was Basic'},
+  {col:'trial_engagement_level',label:'Trial Eng'},
+  {col:'tenure_bucket',label:'Tenure'},
+  {col:'cancel_timing_bucket',label:'Cancel'},
+];
+const COMPARE_OPTIONS = [
+  {col:'subscription_period',label:'Plan'},
+  {col:'__none__',label:'None'},
+  {col:'if_trial',label:'Trial'},
+  {col:'platform',label:'Platform'},
+  {col:'country_group',label:'Country'},
+  {col:'rfmc_segment',label:'RFMC'},
+  {col:'conversion_trigger',label:'Trigger'},
+  {col:'trial_engagement_level',label:'Trial Eng'},
+  {col:'tenure_bucket',label:'Tenure'},
+  {col:'was_basic_user',label:'Was Basic'},
+];
+const PALETTE = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+
+// ================================================================
+// FILE UPLOAD + AUTO-LOAD
+// ================================================================
+const dz = document.getElementById('drop-zone');
+const fi = document.getElementById('csv-input');
+dz.onclick = () => fi.click();
+dz.ondragover = e => { e.preventDefault(); dz.style.borderColor='#3b82f6'; };
+dz.ondragleave = () => { dz.style.borderColor='#e2e8f0'; };
+dz.ondrop = e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); };
+fi.onchange = e => loadFile(e.target.files[0]);
+
+fetch('journey_data.csv').then(r => {
+  if (!r.ok) throw new Error('not found');
+  return r.text();
+}).then(csv => {
+  Papa.parse(csv, { header:true, dynamicTyping:true, skipEmptyLines:true, complete: res => {
+    if (res.data.length > 100) { processData(res.data); }
+  }});
+}).catch(() => {});
+
+function loadFile(f) {
+  if (!f) return;
+  Papa.parse(f, { header:true, dynamicTyping:true, skipEmptyLines:true, complete: res => {
+    processData(res.data);
+  }});
+}
+
+function processData(data) {
+  RAW = data;
+  RAW.forEach(r => {
+    r.has_retention_window = r.has_retention_window===true || String(r.has_retention_window).toLowerCase()==='true';
+    r.is_active_day = r.is_active_day===true || String(r.is_active_day).toLowerCase()==='true';
+    ['if_trial','games_played','is_retained_next_30d','has_rfmc','has_nongame_activity_30d',
+     'is_reinstall','was_basic_user','trial_games_played','trial_game_active_days',
+     'nongame_plays_30d','journey_day','w0_games_played','w0_active_days','w0_is_active'].forEach(c => { r[c] = Number(r[c]) || 0; });
+    const dtc = r.days_to_cancel;
+    r.days_to_cancel = (dtc!=null && dtc!=='' && String(dtc)!=='null') ? Number(dtc) : null;
+    r.cancelled_30d = (r.days_to_cancel !== null && r.days_to_cancel <= 30) ? 1 : 0;
+  });
+  if (new Set(RAW.map(r=>r.journey_day)).size > 1) RAW = RAW.filter(r=>r.journey_day===0);
+  document.getElementById('file-upload').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  buildControls();
+  render();
+}
+
+// ================================================================
+// CONTROLS
+// ================================================================
+function buildControls() {
+  const bar = document.getElementById('controls-bar');
+  let html = '<div class="ctrl compare"><label>Compare by</label><select id="cmp-select">';
+  COMPARE_OPTIONS.forEach(o => { html += `<option value="${o.col}">${o.label}</option>`; });
+  html += '</select></div><div class="sep"></div>';
+  FILTERS.forEach(f => {
+    const vals = [...new Set(RAW.map(r=>r[f.col]))].filter(v=>v!=null&&v!=='').sort();
+    if (vals.length < 2) return;
+    html += `<div class="ctrl"><label>${f.label}</label><select data-col="${f.col}"><option value="__all__">All</option>`;
+    vals.forEach(v => { html += `<option value="${v}">${fmtVal(f.col,v)}</option>`; });
+    html += '</select></div>';
+  });
+  html += '<div class="ctrl"><label>&nbsp;</label><button onclick="resetFilters()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer">Reset</button></div>';
+  bar.innerHTML = html;
+  bar.querySelectorAll('select').forEach(s => s.addEventListener('change', render));
+  // Wire toggle checkboxes
+  document.querySelectorAll('.toggles input').forEach(cb => cb.addEventListener('change', render));
+}
+
+function resetFilters() {
+  document.querySelectorAll('.controls select[data-col]').forEach(s => { s.value = '__all__'; });
+  render();
+}
+
+function fmtVal(col, v) {
+  if (col==='if_trial') return v==1?'Trial':'Direct';
+  if (col==='is_reinstall') return v==1?'Reinstall':'First install';
+  if (col==='was_basic_user') return v==1?'Was Basic':'Never Basic';
+  if (col==='subscription_period') return v==='1 mon'?'Monthly':v==='1 year'?'Yearly':v;
+  return String(v);
+}
+
+// ================================================================
+// HELPERS
+// ================================================================
+function retRate(users) {
+  if (users.length < 10) return null;
+  const ret = users.filter(r=>r.is_retained_next_30d===1);
+  return ret.length/users.length*100;
+}
+function cancelRate(users) {
+  if (users.length < 10) return null;
+  return users.filter(r=>r.cancelled_30d===1).length/users.length*100;
+}
+function fmt(n) { return n.toLocaleString(); }
+function pct(a,b) { return b?((a/b)*100).toFixed(1):'0.0'; }
+function w0Pct(users) {
+  if (!users.length) return '0';
+  return (users.filter(r=>r.w0_is_active===1).length/users.length*100).toFixed(0);
+}
+function retClass(r) {
+  if (r===null) return 'grey';
+  return r>=50?'green':r>=30?'yellow':'red';
+}
+
+// ================================================================
+// STATS BAR
+// ================================================================
+function renderStats() {
+  const d = FILTERED, n = d.length;
+  const bar = document.getElementById('stats-bar');
+  const w = d, ret = d.filter(r=>r.is_retained_next_30d===1);
+  const trial = d.filter(r=>r.if_trial===1), direct = d.filter(r=>r.if_trial===0);
+  const basic = d.filter(r=>r.was_basic_user===1);
+  bar.innerHTML = `
+    <div class="stat"><div class="l">Users</div><div class="v">${fmt(n)}</div><div class="d">${fmt(trial.length)} trial / ${fmt(direct.length)} direct</div></div>
+    <div class="stat"><div class="l">D31-60 Retention</div><div class="v">${w.length?pct(ret.length,w.length):'—'}%</div><div class="d">${fmt(ret.length)} / ${fmt(w.length)} with window</div></div>
+    <div class="stat"><div class="l">Was Basic</div><div class="v">${pct(basic.length,n)}%</div><div class="d">${fmt(basic.length)} users</div></div>
+    <div class="stat"><div class="l">W0 Active</div><div class="v">${w0Pct(d)}%</div><div class="d">Played any game days 0-6</div></div>`;
+}
+
+// ================================================================
+// MERMAID FLOW
+// ================================================================
+function buildMermaidDef(data) {
+  const lines = ['flowchart LR'];
+  const cls = [];
+  const total = data.length;
+  if (!total) return 'flowchart LR\n    EMPTY["No data for current filters"]';
+
+  // Read toggle state
+  const showBasic = document.getElementById('tog-basic').checked;
+  const showTrial = document.getElementById('tog-trial').checked;
+  const showEng   = document.getElementById('tog-eng').checked;
+  const showW0    = document.getElementById('tog-w0').checked;
+  const showRet   = document.getElementById('tog-ret').checked;
+
+  // Total churn count for relative sizing
+  const totalChurn = data.filter(r=>r.is_retained_next_30d===0).length;
+
+  // Track all churn nodes for post-hoc intensity styling
+  const churnNodes = []; // {key, count}
+
+  // Helpers
+  function addNode(key, label, style) {
+    lines.push(`    ${key}["${label}"]`);
+    cls.push(`class ${key} ${style}`);
+  }
+  function addEdge(from, to, count) {
+    lines.push(`    ${from} -->|"${fmt(count)}"| ${to}`);
+  }
+  function retLabel(users) {
+    const r = retRate(users);
+    return r!==null ? r.toFixed(0)+'%' : '—';
+  }
+  function cancLabel(users) {
+    const c = cancelRate(users);
+    return c!==null ? c.toFixed(0)+'%' : '—';
+  }
+  // Metrics line for intermediate nodes: ret + cancel
+  function metricsLine(users) {
+    return `<span style="font-size:9px">ret ${retLabel(users)} · canc ${cancLabel(users)}</span>`;
+  }
+
+  // Adds W0 + retention nodes from a parent
+  function addW0Ret(parentKey, users) {
+    if (!showW0) return;
+    const act = users.filter(r=>r.w0_is_active===1);
+    const ina = users.filter(r=>r.w0_is_active===0);
+    if (act.length) {
+      const aK = parentKey+'_A';
+      addNode(aK, `Active ${pct(act.length,users.length)}%<br/><b>${fmt(act.length)}</b><br/>${metricsLine(act)}`, retClass(retRate(act)));
+      addEdge(parentKey, aK, act.length);
+      if (showRet) addRetNodes(aK, act);
+    }
+    if (ina.length) {
+      const iK = parentKey+'_I';
+      addNode(iK, `Inactive ${pct(ina.length,users.length)}%<br/><b>${fmt(ina.length)}</b><br/>${metricsLine(ina)}`, retClass(retRate(ina)));
+      addEdge(parentKey, iK, ina.length);
+      if (showRet) addRetNodes(iK, ina);
+    }
+  }
+
+  function addRetNodes(parentKey, users) {
+    if (users.length < 10) return;
+    const ret = users.filter(r=>r.is_retained_next_30d===1);
+    const chu = users.filter(r=>r.is_retained_next_30d===0);
+    addNode(parentKey+'_R', `Ret <b>${fmt(ret.length)}</b> ${pct(ret.length,users.length)}%`, 'green');
+    addEdge(parentKey, parentKey+'_R', ret.length);
+    const cKey = parentKey+'_C';
+    addNode(cKey, `Chu <b>${fmt(chu.length)}</b> ${pct(chu.length,users.length)}%`, 'red');
+    addEdge(parentKey, cKey, chu.length);
+    churnNodes.push({key:cKey, count:chu.length});
+  }
+
+  // Processes a group of users from the deepest visible level
+  function addTerminal(parentKey, users) {
+    if (showW0) { addW0Ret(parentKey, users); }
+    else if (showRet) { addRetNodes(parentKey, users); }
+  }
+
+  const plans = [
+    {key:'M', label:'Monthly', f:r=>r.subscription_period==='1 mon'},
+    {key:'Y', label:'Yearly', f:r=>r.subscription_period==='1 year'},
+  ];
+
+  plans.forEach(plan => {
+    const pu = data.filter(plan.f);
+    if (!pu.length) return;
+    addNode(plan.key, `<b>${plan.label}</b><br/>${fmt(pu.length)} (${pct(pu.length,total)}%)<br/>${metricsLine(pu)}`, 'planNode');
+
+    // Collect groups at the "basic" level (or skip)
+    const basicGroups = showBasic
+      ? [{key:plan.key+'_B',label:'Was Basic',users:pu.filter(r=>r.was_basic_user===1),parent:pu},
+         {key:plan.key+'_N',label:'Never Basic',users:pu.filter(r=>r.was_basic_user===0),parent:pu}]
+      : [{key:plan.key,label:null,users:pu,parent:pu,skip:true}];
+
+    basicGroups.forEach(bg => {
+      if (!bg.users.length) return;
+      if (!bg.skip) {
+        addNode(bg.key, `${bg.label}<br/>${fmt(bg.users.length)} (${pct(bg.users.length,bg.parent.length)}%)<br/>${metricsLine(bg.users)}`, 'basicNode');
+        addEdge(plan.key, bg.key, bg.users.length);
+      }
+      const fromKey = bg.key;
+
+      if (!showTrial) {
+        if (showEng) {
+          const engs = [
+            {key:fromKey+'_3',label:'3+ game days',f:r=>r.trial_engagement_level==='trial_3+_game_days'},
+            {key:fromKey+'_1',label:'1-2 game days',f:r=>r.trial_engagement_level==='trial_1-2_game_days'},
+            {key:fromKey+'_0',label:'0 game days',f:r=>r.trial_engagement_level==='trial_0_game_days'},
+            {key:fromKey+'_D',label:'Direct',f:r=>r.if_trial===0},
+          ];
+          engs.forEach(eng => {
+            const eu = bg.users.filter(eng.f);
+            if (!eu.length) return;
+            const style = eng.label==='Direct' ? 'directNode' : 'engNode';
+            addNode(eng.key, `${eng.label}<br/><b>${fmt(eu.length)}</b> (${pct(eu.length,bg.users.length)}%)<br/>${metricsLine(eu)}`, style);
+            addEdge(fromKey, eng.key, eu.length);
+            addTerminal(eng.key, eu);
+          });
+        } else {
+          addTerminal(fromKey, bg.users);
+        }
+        return;
+      }
+
+      // Trial / Direct split
+      const paths = [
+        {key:fromKey+'_T',label:'Trial',f:r=>r.if_trial===1,isTrial:true},
+        {key:fromKey+'_D',label:'Direct',f:r=>r.if_trial===0,isTrial:false},
+      ];
+
+      paths.forEach(path => {
+        const tu = bg.users.filter(path.f);
+        if (!tu.length) return;
+
+        if (path.isTrial) {
+          addNode(path.key, `Trial<br/>${fmt(tu.length)} (${pct(tu.length,bg.users.length)}%)<br/>${metricsLine(tu)}`, 'trialNode');
+          addEdge(fromKey, path.key, tu.length);
+
+          if (showEng) {
+            const engs = [
+              {key:path.key+'_3',label:'3+ game days',f:r=>r.trial_engagement_level==='trial_3+_game_days'},
+              {key:path.key+'_1',label:'1-2 game days',f:r=>r.trial_engagement_level==='trial_1-2_game_days'},
+              {key:path.key+'_0',label:'0 game days',f:r=>r.trial_engagement_level==='trial_0_game_days'},
+            ];
+            engs.forEach(eng => {
+              const eu = tu.filter(eng.f);
+              if (!eu.length) return;
+              addNode(eng.key, `${eng.label}<br/><b>${fmt(eu.length)}</b> (${pct(eu.length,tu.length)}%)<br/>${metricsLine(eu)}`, 'engNode');
+              addEdge(path.key, eng.key, eu.length);
+              addTerminal(eng.key, eu);
+            });
+          } else {
+            addTerminal(path.key, tu);
+          }
+        } else {
+          addNode(path.key, `Direct<br/>${fmt(tu.length)} (${pct(tu.length,bg.users.length)}%)<br/>${metricsLine(tu)}`, 'directNode');
+          addEdge(fromKey, path.key, tu.length);
+          addTerminal(path.key, tu);
+        }
+      });
+    });
+  });
+
+  // Style definitions
+  lines.push('');
+  lines.push('    classDef planNode fill:#dbeafe,stroke:#3b82f6,color:#1e40af,font-weight:bold');
+  lines.push('    classDef basicNode fill:#e0e7ff,stroke:#6366f1,color:#3730a3');
+  lines.push('    classDef trialNode fill:#f3e8ff,stroke:#9333ea,color:#6b21a8');
+  lines.push('    classDef engNode fill:#faf5ff,stroke:#a855f7,color:#6b21a8');
+  lines.push('    classDef directNode fill:#f0fdf4,stroke:#22c55e,color:#166534');
+  lines.push('    classDef green fill:#dcfce7,stroke:#166534,color:#166534');
+  lines.push('    classDef yellow fill:#fef3c7,stroke:#92400e,color:#92400e');
+  lines.push('    classDef red fill:#fee2e2,stroke:#991b1b,color:#991b1b');
+  lines.push('    classDef grey fill:#f1f5f9,stroke:#94a3b8,color:#64748b');
+
+  // Churn intensity: biggest churn groups get darker red via inline style override
+  if (churnNodes.length && totalChurn > 0) {
+    const maxChu = Math.max(...churnNodes.map(c=>c.count));
+    churnNodes.forEach(cn => {
+      const share = cn.count / totalChurn;
+      const intensity = cn.count / maxChu; // 0..1, 1 = biggest churn group
+      // Scale from light red (#fee2e2) to dark red (#991b1b bg)
+      // Use stroke-width + fill darkness to signal magnitude
+      if (intensity >= 0.7) {
+        lines.push(`    style ${cn.key} fill:#fca5a5,stroke:#991b1b,stroke-width:3px,color:#7f1d1d`);
+      } else if (intensity >= 0.4) {
+        lines.push(`    style ${cn.key} fill:#fecaca,stroke:#b91c1c,stroke-width:2px,color:#991b1b`);
+      }
+      // <0.4 keeps default red classDef (lightest)
+    });
+  }
+
+  lines.push('');
+  lines.push('    ' + cls.join('\n    '));
+
+  return lines.join('\n');
+}
+
+let renderGeneration = 0;
+
+async function renderFlow(groups) {
+  const gen = ++renderGeneration;
+  const wrap = document.querySelector('.flow-wrap');
+
+  // Clean up leftover Mermaid temp elements from previous renders
+  document.querySelectorAll('svg[id^="flow_"]').forEach(el => {
+    if (!el.closest('.flow-wrap')) el.remove();
+  });
+  document.querySelectorAll('div[id^="dflow_"]').forEach(el => el.remove());
+
+  const stageHtml = getStageHeadersHtml();
+
+  if (groups.length === 1) {
+    // Single flow
+    wrap.innerHTML = `<div class="flow-card">${stageHtml}<div id="flow-body" class="flow-body"></div></div>`;
+    const def = buildMermaidDef(groups[0].data);
+    if (gen !== renderGeneration) return; // superseded
+    try {
+      const id = 'flow_' + (renderCounter++);
+      const { svg } = await mermaid.render(id, def);
+      if (gen !== renderGeneration) return; // superseded
+      document.getElementById('flow-body').innerHTML = svg;
+    } catch(e) {
+      if (gen !== renderGeneration) return;
+      console.error('Mermaid render error:', e, '\nDefinition:\n', def);
+      document.getElementById('flow-body').innerHTML = '<p style="color:var(--red);padding:20px">Render error: ' + e.message + '</p>';
+    }
+  } else {
+    // Side-by-side compare
+    let html = '<div class="compare-grid">';
+    groups.forEach((g,i) => {
+      html += `<div class="compare-panel"><div class="flow-card"><h4 style="color:${PALETTE[i%PALETTE.length]}">${g.label} (n=${fmt(g.data.length)})</h4>${stageHtml}<div id="flow-cmp-${i}" class="flow-body"></div></div></div>`;
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+
+    // Render each panel
+    for (let i=0; i<groups.length; i++) {
+      if (gen !== renderGeneration) return;
+      const def = buildMermaidDef(groups[i].data);
+      try {
+        const id = 'flow_' + (renderCounter++);
+        const { svg } = await mermaid.render(id, def);
+        if (gen !== renderGeneration) return;
+        document.getElementById('flow-cmp-'+i).innerHTML = svg;
+      } catch(e) {
+        if (gen !== renderGeneration) return;
+        console.error('Mermaid render error (panel '+i+'):', e);
+        document.getElementById('flow-cmp-'+i).innerHTML = '<p style="color:var(--red);font-size:11px;padding:12px">' + e.message + '</p>';
+      }
+    }
+  }
+}
+
+// ================================================================
+// MAIN RENDER
+// ================================================================
+async function render() {
+  const activeFilters = {};
+  document.querySelectorAll('.controls select[data-col]').forEach(s => {
+    if (s.value !== '__all__') activeFilters[s.dataset.col] = s.value;
+  });
+  FILTERED = RAW.filter(r => {
+    if (!r.has_retention_window) return false;
+    for (const [c,v] of Object.entries(activeFilters)) {
+      if (String(r[c]) !== String(v)) return false;
+    }
+    return true;
+  });
+
+  const parts = Object.entries(activeFilters).map(([c,v]) => {
+    const f = FILTERS.find(x=>x.col===c);
+    return `${f?f.label:c}=${fmtVal(c,v)}`;
+  });
+  document.getElementById('filter-summary').textContent = parts.length ? 'Filtered: '+parts.join(' | ') : '';
+
+  // Compute compare groups
+  const cmpCol = document.getElementById('cmp-select').value;
+  let groups;
+  if (cmpCol === '__none__') {
+    groups = [{label:'All', data:FILTERED}];
+  } else {
+    const vals = [...new Set(FILTERED.map(r=>r[cmpCol]))].filter(v=>v!=null&&v!=='').sort();
+    groups = vals.map(v => ({label:fmtVal(cmpCol,v), data:FILTERED.filter(r=>String(r[cmpCol])===String(v))}));
+  }
+
+  renderStats();
+  await renderFlow(groups);
+}
+
+function getStageHeadersHtml() {
+  const stages = [{label:'Plan'}];
+  if (document.getElementById('tog-basic').checked) stages.push({label:'Was Basic?'});
+  if (document.getElementById('tog-trial').checked) stages.push({label:'Trial Path'});
+  if (document.getElementById('tog-eng').checked)   stages.push({label:'Trial Engagement'});
+  if (document.getElementById('tog-w0').checked)     stages.push({label:'W0 Activation'});
+  if (document.getElementById('tog-ret').checked)    stages.push({label:'Retained'});
+  return '<div class="stage-headers">' + stages.map(s => `<div class="stage-header">${s.label}</div>`).join('') + '</div>';
+}
+</script>
+</body>
+</html>
